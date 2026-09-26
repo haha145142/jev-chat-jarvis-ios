@@ -60,22 +60,22 @@ struct SetupView: View {
                     ? jevLocalized(store.language, zh: "配置可以同步到键盘", en: "Configuration syncs to the keyboard")
                     : jevLocalized(store.language, zh: "共享容器不可用（全能签等第三方证书常见）：用下面的按钮复制配置，再到键盘点「导入配置」", en: "Shared container unavailable (common with third-party certificates): copy config below, then tap Import Config in the keyboard."))
 
-            if !groupOK {
-                Button {
-                    if JevStore.exportConfigToPasteboard() {
-                        copyHint = jevLocalized(store.language,
-                            zh: "已复制：现在去聊天里切到 Jev 键盘，点「从剪贴板导入配置」",
-                            en: "Copied: switch to Jev Keyboard and tap Import Config.")
-                    } else {
-                        copyHint = jevLocalized(store.language, zh: "复制失败，请先到「模型」页完成配置", en: "Copy failed: configure Models first.")
-                    }
-                } label: {
-                    Label(jevLocalized(store.language, zh: "复制配置到剪贴板", en: "Copy Config to Clipboard"),
-                          systemImage: "doc.on.doc")
+            // 始终显示：groupWritable 在 App 进程内会误判（退化私有容器写入也成功），
+            // 所以不能靠它决定按钮显隐。键盘不支持共享时全靠这个按钮搬运配置。
+            Button {
+                if JevStore.exportConfigToPasteboard() {
+                    copyHint = jevLocalized(store.language,
+                        zh: "已复制：现在去聊天里切到 Jev 键盘，点「从剪贴板导入配置」（iOS 弹粘贴授权请点允许）",
+                        en: "Copied: switch to Jev Keyboard and tap Import Config (allow the paste prompt).")
+                } else {
+                    copyHint = jevLocalized(store.language, zh: "复制失败，请先到「模型」页完成配置", en: "Copy failed: configure Models first.")
                 }
-                if !copyHint.isEmpty {
-                    Text(copyHint).font(.caption).foregroundStyle(.secondary)
-                }
+            } label: {
+                Label(jevLocalized(store.language, zh: "复制配置到剪贴板", en: "Copy Config to Clipboard"),
+                      systemImage: "doc.on.doc")
+            }
+            if !copyHint.isEmpty {
+                Text(copyHint).font(.caption).foregroundStyle(.secondary)
             }
         } header: {
             Text(jevLocalized(store.language, zh: "状态", en: "Status"))

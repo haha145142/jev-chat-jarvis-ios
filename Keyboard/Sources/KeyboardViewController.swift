@@ -728,10 +728,16 @@ final class KeyboardViewController: UIInputViewController {
     @objc private func importConfig() {
         guard hasFullAccess else { setMode(.gate); return }
         if JevStore.importConfigFromPasteboard() {
-            setMode(.idle)
+            let alert = UIAlertController(
+                title: L("导入成功 ✅", "Imported ✅"),
+                message: L("键盘已保存配置。接下来：长按对方消息 → 复制 → 点「分析剪贴板」",
+                           "Config saved. Next: long-press a message → Copy → Analyze Clipboard."),
+                preferredStyle: .alert)
+            alert.addAction(UIAlertAction(title: L("好", "OK"), style: .default) { _ in self.setMode(.idle) })
+            present(alert, animated: true)
         } else {
-            errorText = L("剪贴板里没有配置。请先打开 Jev Jarvis App →「开始」页点「复制配置」，再回来点这个按钮。",
-                          "No config on the clipboard. Open Jev Jarvis → Setup → Copy Config, then try again.")
+            errorText = L("剪贴板里没有配置。请先打开 Jev Jarvis App →「开始」页点「复制配置到剪贴板」（注意顺序：先导入配置，再复制聊天消息），iOS 若弹粘贴授权请点允许。",
+                          "No config on the clipboard. Open Jev Jarvis → Setup → Copy Config first (import config before copying any chat message), and allow the paste prompt.")
             setMode(.error)
         }
     }
