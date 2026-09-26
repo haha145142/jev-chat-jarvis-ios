@@ -101,12 +101,13 @@ extension JevStore {
     private static let languageKey = "jev.language.v1"
 
     static func loadLanguage() -> JevLanguage {
-        guard let raw = defaults.string(forKey: languageKey),
+        guard let raw = groupDefaults.string(forKey: languageKey),
               let language = JevLanguage(rawValue: raw) else { return .chinese }
         return language
     }
 
     static func saveLanguage(_ language: JevLanguage) {
-        defaults.set(language.rawValue, forKey: languageKey)
+        groupDefaults.set(language.rawValue, forKey: languageKey)
+        privateDefaults.set(language.rawValue, forKey: languageKey)
     }
 }

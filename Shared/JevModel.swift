@@ -1,4 +1,7 @@
 import Foundation
+#if canImport(UIKit)
+import UIKit
+#endif
 
 // MARK: - 配置模型
 
@@ -129,49 +132,83 @@ enum JevStore {
     private static let statusKey = "jev.kbstatus.v1"
     private static let canaryKey = "jev.canary.v1"
 
-    static var defaults: UserDefaults {
+    /// App Group 共享库。签名没带 app-group entitlement 时，suite 会静默退化成
+    /// 「当前进程私有」的容器（App 与键盘互不可见）——所以不能只靠它。
+    static var groupDefaults: UserDefaults {
         UserDefaults(suiteName: appGroupID) ?? .standard
     }
+
+    /// 本进程真正的私有库（无需任何 entitlement）。键盘通过剪贴板导入的配置存这里。
+    static var privateDefaults: UserDefaults { .standard }
 
     /// App Group 容器是否真的可写可读（签名没带上 entitlement 时 suite 会静默退化为私有容器）。
     static var groupWritable: Bool {
         let stamp = "t\(Date().timeIntervalSince1970)"
-        defaults.set(stamp, forKey: canaryKey)
-        return defaults.string(forKey: canaryKey) == stamp
+        groupDefaults.set(stamp, forKey: canaryKey)
+        return groupDefaults.string(forKey: canaryKey) == stamp
+    }
+
+    private static func decodeConfig(_ store: UserDefaults) -> JevConfig? {
+        guard let data = store.data(forKey: configKey),
+              let cfg = try? JSONDecoder().decode(JevConfig.self, from: data) else { return nil }
+        return cfg
     }
 
     static func loadConfig() -> JevConfig {
-        guard let data = defaults.data(forKey: configKey),
-              var cfg = try? JSONDecoder().decode(JevConfig.self, from: data) else {
-            return JevConfig()
+        if var cfg = decodeConfig(groupDefaults) {
+            if cfg.genBase == removedGenerationBase {
+                let preset = ProviderPreset.all.first { $0.id == "zhipu" }
+                cfg.genKind = preset?.kind ?? .openai
+                cfg.genBase = preset?.base ?? ""
+                cfg.genKey = ""
+                cfg.genModel = preset?.model ?? ""
+                cfg.genExtraJSON = ""
+                saveConfig(cfg)
+            }
+            return cfg
         }
-        if cfg.genBase == removedGenerationBase {
-            let preset = ProviderPreset.all.first { $0.id == "zhipu" }
-            cfg.genKind = preset?.kind ?? .openai
-            cfg.genBase = preset?.base ?? ""
-            cfg.genKey = ""
-            cfg.genModel = preset?.model ?? ""
-            cfg.genExtraJSON = ""
-            saveConfig(cfg)
-        }
-        return cfg
+        if let cfg = decodeConfig(privateDefaults) { return cfg }
+        return JevConfig()
     }
 
     static func saveConfig(_ cfg: JevConfig) {
         if let data = try? JSONEncoder().encode(cfg) {
-            defaults.set(data, forKey: configKey)
+            groupDefaults.set(data, forKey: configKey)
+            privateDefaults.set(data, forKey: configKey)
         }
     }
 
+    // MARK: 无 App Group 时的配置搬运（全能签等第三方证书）
+
+    /// 主 App：把当前配置编码成 JSON 放到系统剪贴板，键盘端「导入配置」读取。
+    @discardableResult
+    static func exportConfigToPasteboard() -> Bool {
+        guard let data = try? JSONEncoder().encode(loadConfig()),
+              let s = String(data: data, encoding: .utf8) else { return false }
+        UIPasteboard.general.string = s
+        return true
+    }
+
+    /// 键盘端：从系统剪贴板读取配置 JSON，存入本进程私有库。
+    @discardableResult
+    static func importConfigFromPasteboard() -> Bool {
+        guard let s = UIPasteboard.general.string?
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+              let data = s.data(using: .utf8),
+              let cfg = try? JSONDecoder().decode(JevConfig.self, from: data) else { return false }
+        saveConfig(cfg)
+        return true
+    }
+
     static func loadKeyboardStatus() -> KeyboardStatus? {
-        guard let data = defaults.data(forKey: statusKey),
+        guard let data = groupDefaults.data(forKey: statusKey),
               let s = try? JSONDecoder().decode(KeyboardStatus.self, from: data) else { return nil }
         return s
     }
 
     static func saveKeyboardStatus(_ s: KeyboardStatus) {
         if let data = try? JSONEncoder().encode(s) {
-            defaults.set(data, forKey: statusKey)
+            groupDefaults.set(data, forKey: statusKey)
         }
     }
 
@@ -189,8 +226,8 @@ enum JevStore {
     /// 再用 `xcrun devicectl device copy from --domain-type appGroupDataContainer` 拉出来看。
     static func diag(_ line: String) {
         let stamp = String(format: "%.3f", Date().timeIntervalSince1970)
-        let prev = defaults.string(forKey: diagKey) ?? ""
-        defaults.set(String((prev + "[\(stamp)] \(line)\n").suffix(6000)), forKey: diagKey)
+        let prev = groupDefaults.string(forKey: diagKey) ?? ""
+        groupDefaults.set(String((prev + "[\(stamp)] \(line)\n").suffix(6000)), forKey: diagKey)
     }
 #endif
 }

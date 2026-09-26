@@ -6,6 +6,7 @@ struct SetupView: View {
     @EnvironmentObject private var store: ConfigStore
     @State private var kbStatus: KeyboardStatus?
     @State private var groupOK = false
+    @State private var copyHint = ""
 
     private let timer = Timer.publish(every: 2, on: .main, in: .common).autoconnect()
 
@@ -57,7 +58,25 @@ struct SetupView: View {
             row(icon: "externaldrive.connected.to.line.below", title: jevLocalized(store.language, zh: "App Group 共享", en: "App Group sharing"),
                 ok: groupOK, detail: groupOK
                     ? jevLocalized(store.language, zh: "配置可以同步到键盘", en: "Configuration syncs to the keyboard")
-                    : jevLocalized(store.language, zh: "共享容器不可用：请确认用 Xcode 把 App 和键盘扩展签在同一个 Team 下", en: "The shared container is unavailable. Sign both targets with the same Team."))
+                    : jevLocalized(store.language, zh: "共享容器不可用（全能签等第三方证书常见）：用下面的按钮复制配置，再到键盘点「导入配置」", en: "Shared container unavailable (common with third-party certificates): copy config below, then tap Import Config in the keyboard."))
+
+            if !groupOK {
+                Button {
+                    if JevStore.exportConfigToPasteboard() {
+                        copyHint = jevLocalized(store.language,
+                            zh: "已复制：现在去聊天里切到 Jev 键盘，点「从剪贴板导入配置」",
+                            en: "Copied: switch to Jev Keyboard and tap Import Config.")
+                    } else {
+                        copyHint = jevLocalized(store.language, zh: "复制失败，请先到「模型」页完成配置", en: "Copy failed: configure Models first.")
+                    }
+                } label: {
+                    Label(jevLocalized(store.language, zh: "复制配置到剪贴板", en: "Copy Config to Clipboard"),
+                          systemImage: "doc.on.doc")
+                }
+                if !copyHint.isEmpty {
+                    Text(copyHint).font(.caption).foregroundStyle(.secondary)
+                }
+            }
         } header: {
             Text(jevLocalized(store.language, zh: "状态", en: "Status"))
         } footer: {

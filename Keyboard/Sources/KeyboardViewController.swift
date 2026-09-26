@@ -393,6 +393,12 @@ final class KeyboardViewController: UIInputViewController {
             let warn = KB.label(L("⚠️ 还没配置生成层：打开 Jev Jarvis App →「模型」页填 API Key", "⚠️ Generation is not configured: open Jev Jarvis → Models and add an API key"),
                                 font: .systemFont(ofSize: 12), color: .systemOrange, lines: 0)
             vstack.addArrangedSubview(warn)
+            // 全能签等第三方证书没有 App Group：从主 App「复制配置」后，点这里导入
+            let importBtn = KB.button(L("从剪贴板导入配置", "Import Config from Clipboard"), icon: "square.and.arrow.down",
+                                      font: .systemFont(ofSize: 13))
+            importBtn.heightAnchor.constraint(equalToConstant: 36).isActive = true
+            importBtn.addTarget(self, action: #selector(importConfig), for: .touchUpInside)
+            vstack.addArrangedSubview(importBtn)
         }
         fitBlocks = [vstack]
         return vstack
@@ -664,7 +670,14 @@ final class KeyboardViewController: UIInputViewController {
         let btns = UIStackView(arrangedSubviews: [retry, close])
         btns.axis = .horizontal
         btns.spacing = 8
-        let vstack = UIStackView(arrangedSubviews: [title, body, btns])
+        var items: [UIView] = [title, body]
+        if errorText.contains("还没配置生成层") || errorText.contains("Generation is not configured") {
+            let importBtn = KB.button(L("从剪贴板导入配置", "Import Config"), icon: "square.and.arrow.down", primary: true)
+            importBtn.addTarget(self, action: #selector(importConfig), for: .touchUpInside)
+            items.append(importBtn)
+        }
+        items.append(btns)
+        let vstack = UIStackView(arrangedSubviews: items)
         vstack.axis = .vertical
         vstack.spacing = 8
         vstack.isLayoutMarginsRelativeArrangement = true
@@ -710,6 +723,18 @@ final class KeyboardViewController: UIInputViewController {
 
     @objc private func regenerate() { run(message: lastMessage) }
     @objc private func backToIdle() { setMode(.idle) }
+
+    /// 无 App Group 时（全能签等第三方证书）：从系统剪贴板导入主 App 复制的配置。
+    @objc private func importConfig() {
+        guard hasFullAccess else { setMode(.gate); return }
+        if JevStore.importConfigFromPasteboard() {
+            setMode(.idle)
+        } else {
+            errorText = L("剪贴板里没有配置。请先打开 Jev Jarvis App →「开始」页点「复制配置」，再回来点这个按钮。",
+                          "No config on the clipboard. Open Jev Jarvis → Setup → Copy Config, then try again.")
+            setMode(.error)
+        }
+    }
 
     private func run(message: String) {
         lastMessage = message
