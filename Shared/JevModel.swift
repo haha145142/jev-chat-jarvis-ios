@@ -82,7 +82,7 @@ struct GenCredentials {
 /// 话术槽上限。iOS 比 macOS 少一个：手机屏幕高度有限，3 槽 × 2 条 = 最多 6 条候选
 /// 会把键盘顶到半个屏幕以上，2 槽 4 条是屏幕占用与可选性的平衡点。
 /// 存在的槽位依然保留在配置里（只是不参与），日后想放开只改这一个数。
-let MAX_SLOTS = 2
+let MAX_SLOTS = 5
 
 /// 全部配置。存 App Group，键盘扩展与主 App 共享同一份。
 struct JevConfig: Codable, Equatable {
