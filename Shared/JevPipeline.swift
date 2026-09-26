@@ -69,8 +69,13 @@ final class JevPipeline {
             return out
         }
 
-        // 狗头军师知识：按消息路由挑文献，整条分析只算一次，随每次起草请求带上。
-        let knowledge = GoutouKnowledge.snippet(for: msg, context: context)
+        // 知识融合（整条分析只算一次）：内置笔记命中=关系原则纲领，军师文献=具体方法参考。
+        let noteBg = JevNoteStore.background(for: msg)
+        let methods = GoutouKnowledge.snippet(for: msg, context: context)
+        var knowledgeParts: [String] = []
+        if !noteBg.isEmpty { knowledgeParts.append("【关系原则·本地笔记命中】\n" + noteBg) }
+        if !methods.isEmpty { knowledgeParts.append("【方法参考·军师文献】\n" + methods) }
+        let knowledge = knowledgeParts.joined(separator: "\n\n")
 
         // 1) 判断层：起跑，但**不阻塞起草**。
         //
