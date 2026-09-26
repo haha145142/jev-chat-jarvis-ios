@@ -78,7 +78,7 @@ enum GoutouKnowledge {
             if body.count >= remaining { break }
         }
 
-        var out = "（狗头军师知识，仅作回复依据，不要在回复里提及）\n"
+        var out = "（狗头军师方法库：把其中原则与步骤化进回复，不要照抄或提及）\n"
         out += corePrinciples + "\n\n"
         out += body
         return out

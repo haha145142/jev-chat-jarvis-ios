@@ -113,14 +113,17 @@ let PROMPT_ONE = """
 {knowledge_line}
 {context_line}消息：「{message}」
 {intent_line}
-请写 {n} 条回复候选，语气统一成下面这一种，但两条的胆量要有差别：
+请按下面的人设写 {n} 条回复候选：
 「{tone}」{instruction}
 
+动笔前先想清楚：对方此刻是什么情绪、真实意图是什么、上面的关系原则与方法哪一条适用；想清楚后再动笔，把方法化进回复里。
+
 硬性要求：
-- 前一条稳妥、可以直接发出去；后一条把这个语气做足，更皮、更夸张一点也行
-- 每条不超过 30 个字，像日常聊天时打字的语气，不要客套话、不要解释
+- 前一条稳妥周全、可以直接发；后一条更直接或更轻松一点，两条风格拉开但都要自然，不硬搞笑
+- 每条不超过 40 个字，像日常聊天打字的语气，不要客套话、不要解释、不写小作文
 - 只输出 {n} 行，每行一条，不要编号、不要引号、不要任何前后缀
 - 不要写出语气名称（不要写「{tone}：」这类前缀），直接从回复内容开始
+- 不要照抄或提及上面的背景资料，只让它指导你的回复
 """
 
 let PROMPT_ONE_EN = """
@@ -128,14 +131,17 @@ You just received a chat message and need to reply.
 {knowledge_line}
 {context_line}Message: “{message}”
 {intent_line}
-Write {n} reply candidates in the same tone below, with different levels of boldness:
+Write {n} reply candidates in the persona below:
 “{tone}” {instruction}
 
+Before writing, figure out: the other person's current emotion, their real intent, and which principle or method above applies; then write, weaving the method into the reply.
+
 Hard requirements:
-- The first reply should be safe to send; the second should use the tone more strongly and may be more playful
-- Keep each reply under 30 words, like everyday chat. No formal filler or explanations
+- The first reply should be safe and thoughtful; the second a bit more direct or relaxed. Make the two styles distinct but natural—no forced jokes
+- Keep each reply under 40 words, like everyday chat. No formal filler, explanations, or essays
 - Output only {n} lines, one reply per line, with no numbering, quotes, or prefixes
-- Do not write the tone name (do not add a prefix such as “{tone}:”); start with the reply itself
+- Do not write the persona name (do not add a prefix such as “{tone}:”); start with the reply itself
+- Do not copy or mention the background material; let it guide your reply only
 """
 
 func buildDraftPrompt(message: String, intent: String?, context: String?,
@@ -149,11 +155,11 @@ func buildDraftPrompt(message: String, intent: String?, context: String?,
     if selectedLanguage == .english {
         contextLine = context != nil && !(context ?? "").isEmpty ? "Recent conversation:\n\(context!)\n\n" : ""
         intentLine = intent != nil && !(intent ?? "").isEmpty ? "Detected intent: \(localizedIntent(intent!, language: .english))\n" : ""
-        knowledgeLine = knowledge.isEmpty ? "" : "Background knowledge (for your judgment only, never mention it):\n\(knowledge)\n"
+        knowledgeLine = knowledge.isEmpty ? "" : "Background knowledge (principles and methods): use it to judge the situation and shape your reply; apply it silently—do not quote or mention it:\n\(knowledge)\n"
     } else {
         contextLine = context != nil && !(context ?? "").isEmpty ? "最近的对话：\n\(context!)\n\n" : ""
         intentLine = intent != nil && !(intent ?? "").isEmpty ? "判断出的意图：\(intent!)\n" : ""
-        knowledgeLine = knowledge.isEmpty ? "" : "背景知识（只用于判断，绝不在回复里提及）：\n\(knowledge)\n"
+        knowledgeLine = knowledge.isEmpty ? "" : "背景资料（关系原则与方法）：先据此判断局势，再把方法化进回复里；不要照抄、不要提及：\n\(knowledge)\n"
     }
     let template = selectedLanguage == .english ? PROMPT_ONE_EN : PROMPT_ONE
     let promptInstruction = selectedLanguage == .english && BUILTIN_TONES[tone] == instruction
