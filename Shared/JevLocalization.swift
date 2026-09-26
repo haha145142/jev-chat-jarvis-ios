@@ -60,6 +60,7 @@ func localizedActions(_ actions: [String], language: JevLanguage) -> [String] {
 func localizedToneName(_ name: String, language: JevLanguage) -> String {
     guard language == .english else { return name }
     return [
+        "狗头军师": "Goutou Strategist",
         "高情商话术": "High EQ", "贴吧老哥 v1.0": "Forum bro v1.0", "拒绝加班": "Decline overtime",
         "卑微乙方": "Humble vendor", "稳如老狗": "Calm engineer", "已读乱回": "Minimal reply",
         "鱼塘主": "The charmer", "职场黑话": "Corporate jargon", "阴阳怪气": "Sarcastic",
@@ -80,6 +81,7 @@ func localizedProviderName(_ id: String, language: JevLanguage) -> String? {
 
 func toneEnglishDescription(_ name: String) -> String {
     [
+        "狗头军师": "A sharp, warm friend: hold the emotion first, read the situation, then give a plain-spoken reply with a point of view.",
         "高情商话术": "A thoughtful coworker: acknowledge feelings, state facts, and offer a concrete next step.",
         "贴吧老哥 v1.0": "Internet slang, casual and self-deprecating, with no formal pleasantries.",
         "拒绝加班": "Set a calm, firm boundary and give a specific alternative time.",

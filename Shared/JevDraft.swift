@@ -50,8 +50,10 @@ final class JevDraft {
 
     /// 一个话术一次调用，返回 2 条候选（前稳后放）。失败抛错，由管线层归拢。
     func draft(message: String, intent: String?, context: String?,
+               knowledge: String = "",
                tone: String, instruction: String) async throws -> [String] {
         let prompt = buildDraftPrompt(message: message, intent: intent, context: context,
+                                      knowledge: knowledge,
                                       tone: tone, instruction: instruction, n: PER_TONE)
         let raw = try await call(prompt: prompt)
         let lines = CandidateParser.parse(raw)

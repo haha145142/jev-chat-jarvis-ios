@@ -55,6 +55,7 @@ let NONE_LABEL = "不用"
 
 /// 内置话术。说明写成「人设 + 口头禅 + 上限约束」而不是形容词——这是 macOS 版实测出的写法。
 let BUILTIN_TONES: [String: String] = [
+    "狗头军师": "你是我的狗头军师：先接住对方情绪、再判断真实意图和局势，给清醒又有温度的回复。像关系好、头脑清楚的朋友——说人话、有立场，不端着不说教，不卑微讨好也不端架子；口语化、带松弛感，该幽默时幽默、该认真时认真；一条消息只做一个主动作，拿不准就先轻松接住。",
     "高情商话术": "像公司里那个谁都说好的老同事：先接住对方情绪（「我理解」「确实」），再说事实和下一步，拒绝也带替代方案加一个具体时间点。不说教、不绕圈子、句尾不堆「呢/哦/啦」。",
     "贴吧老哥 v1.0": "贴吧老哥：一口网感口语，「有一说一」「绷不住了」「搁这」「这就去整」随手就来，自称我、管对方叫「哥/兄弟」，可以自嘲玩梗甚至摆烂，但不骂人。禁止「您好」「感谢」这类书面客套。",
     "拒绝加班": "态度平和但把话说死：明确今天做不完，**不给**「我尽量」「看情况」这种会被继续压的口子；必须给一个具体替代时间（比如「明早九点前」），并说清不用等今晚。道歉不超过一句，理由不超过一句。",
@@ -79,7 +80,7 @@ let BUILTIN_TONES: [String: String] = [
 /// 内置话术的展示顺序，与 macOS 版 `src/styles.py` 的书写顺序一致。
 /// 字典本身是无序的，顺序必须显式写出来——靠 `Array(dict.keys)` 会得到每次运行都可能不同的顺序。
 let BUILTIN_TONE_ORDER: [String] = [
-    "高情商话术", "贴吧老哥 v1.0", "拒绝加班", "卑微乙方", "稳如老狗",
+    "狗头军师", "高情商话术", "贴吧老哥 v1.0", "拒绝加班", "卑微乙方", "稳如老狗",
     "已读乱回", "鱼塘主", "职场黑话", "阴阳怪气", "情绪价值", "夸夸",
     "讨好型人格",
 ]
@@ -109,7 +110,7 @@ func orderedToneNames(custom: [String: String]) -> [String] {
 /// {n} 出现两次是刻意的：「只要 n 行」的要求必须与条数一致，否则模型会自己凑一行。
 let PROMPT_ONE = """
 刚收到一条聊天消息，你要帮我回。
-
+{knowledge_line}
 {context_line}消息：「{message}」
 {intent_line}
 请写 {n} 条回复候选，语气统一成下面这一种，但两条的胆量要有差别：
@@ -124,7 +125,7 @@ let PROMPT_ONE = """
 
 let PROMPT_ONE_EN = """
 You just received a chat message and need to reply.
-
+{knowledge_line}
 {context_line}Message: “{message}”
 {intent_line}
 Write {n} reply candidates in the same tone below, with different levels of boldness:
@@ -138,22 +139,27 @@ Hard requirements:
 """
 
 func buildDraftPrompt(message: String, intent: String?, context: String?,
+                      knowledge: String = "",
                       tone: String, instruction: String, n: Int,
                       language: JevLanguage? = nil) -> String {
     let selectedLanguage = language ?? JevStore.loadLanguage()
     let contextLine: String
     let intentLine: String
+    let knowledgeLine: String
     if selectedLanguage == .english {
         contextLine = context != nil && !(context ?? "").isEmpty ? "Recent conversation:\n\(context!)\n\n" : ""
         intentLine = intent != nil && !(intent ?? "").isEmpty ? "Detected intent: \(localizedIntent(intent!, language: .english))\n" : ""
+        knowledgeLine = knowledge.isEmpty ? "" : "Background knowledge (for your judgment only, never mention it):\n\(knowledge)\n"
     } else {
         contextLine = context != nil && !(context ?? "").isEmpty ? "最近的对话：\n\(context!)\n\n" : ""
         intentLine = intent != nil && !(intent ?? "").isEmpty ? "判断出的意图：\(intent!)\n" : ""
+        knowledgeLine = knowledge.isEmpty ? "" : "背景知识（只用于判断，绝不在回复里提及）：\n\(knowledge)\n"
     }
     let template = selectedLanguage == .english ? PROMPT_ONE_EN : PROMPT_ONE
     let promptInstruction = selectedLanguage == .english && BUILTIN_TONES[tone] == instruction
         ? toneEnglishDescription(tone) : instruction
     return template
+        .replacingOccurrences(of: "{knowledge_line}", with: knowledgeLine)
         .replacingOccurrences(of: "{context_line}", with: contextLine)
         .replacingOccurrences(of: "{message}", with: message)
         .replacingOccurrences(of: "{intent_line}", with: intentLine)

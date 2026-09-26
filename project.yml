@@ -24,6 +24,8 @@ targets:
       - path: App/Sources
       - path: App/Assets.xcassets
       - path: Shared
+      - path: GoutouKnowledge
+        type: folder
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.jevchat.jarvis
@@ -57,6 +59,8 @@ targets:
     sources:
       - path: Keyboard/Sources
       - path: Shared
+      - path: GoutouKnowledge
+        type: folder
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.jevchat.jarvis.keyboard

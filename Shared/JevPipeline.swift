@@ -69,6 +69,9 @@ final class JevPipeline {
             return out
         }
 
+        // 狗头军师知识：按消息路由挑文献，整条分析只算一次，随每次起草请求带上。
+        let knowledge = GoutouKnowledge.snippet(for: msg, context: context)
+
         // 1) 判断层：起跑，但**不阻塞起草**。
         //
         // 为什么不串行等它：实测每次请求光"出第一个字"就要 1.5 秒上下，而喂给起草模型的那句
@@ -116,6 +119,7 @@ final class JevPipeline {
 
         onStage?(.drafting(done: 0, total: active.count))
         var round = await draftRound(active: active, msg: msg, intent: firstIntent, context: context,
+                                     knowledge: knowledge,
                                      onStage: onStage) { r in
             onPartial?(partial(with: r, judge: JevJudgeCache.shared.get(message: msg, context: context)))
         }
@@ -135,6 +139,7 @@ final class JevPipeline {
         if let jr = judgeResult, firstIntent == nil, jr.risk >= Self.refineRiskThreshold, !drafted.isEmpty {
             let note = String(format: "风险 %.0f/9：已按判断重写一版候选", jr.risk)
             round = await draftRound(active: active, msg: msg, intent: jr.intent, context: context,
+                                     knowledge: knowledge,
                                      onStage: onStage) { r in
                 onPartial?(partial(with: r, judge: jr, extraNotices: [note]))
             }
@@ -204,6 +209,7 @@ final class JevPipeline {
 
     /// 跑一轮起草：每个话术一次请求（并发），每完成一个就把"到目前为止的候选"交给界面。
     private func draftRound(active: [(String, String)], msg: String, intent: String?, context: String?,
+                            knowledge: String,
                             onStage: ((PipelineStage) -> Void)?,
                             onPartial: @escaping (DraftRound) -> Void) async -> DraftRound {
         var round = DraftRound()
@@ -213,6 +219,7 @@ final class JevPipeline {
                     do {
                         let texts = try await self.draft.draft(
                             message: msg, intent: intent, context: context,
+                            knowledge: knowledge,
                             tone: name, instruction: instruction)
                         return (name, texts, nil)
                     } catch {

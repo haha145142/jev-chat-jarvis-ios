@@ -1,0 +1,46 @@
+name: Build Unsigned IPA
+on:
+  push:
+    branches: [ master, main ]
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+      - name: Show Xcode version
+        run: xcodebuild -version
+      - name: Regenerate Xcode project
+        run: |
+          brew install xcodegen
+          xcodegen generate
+      - name: Build unsigned app
+        run: |
+          set -o pipefail
+          xcodebuild -project JevJarvis.xcodeproj \
+            -scheme JevJarvis \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            build | xcpretty || xcodebuild -project JevJarvis.xcodeproj -scheme JevJarvis -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' -derivedDataPath build CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" build
+      - name: Package into IPA
+        run: |
+          APP_PATH=$(find build/Build/Products/Release-iphoneos -maxdepth 1 -name "*.app" -type d | head -1)
+          echo "Built app: $APP_PATH"
+          test -d "$APP_PATH"
+          ls "$APP_PATH/PlugIns" || true
+          rm -rf Payload
+          mkdir Payload
+          cp -R "$APP_PATH" Payload/
+          rm -f JevJarvis-unsigned.ipa
+          zip -rq JevJarvis-unsigned.ipa Payload
+          ls -lh JevJarvis-unsigned.ipa
+      - uses: actions/upload-artifact@v4
+        with:
+          name: JevJarvis-goutou-ipa
+          path: JevJarvis-unsigned.ipa
+          retention-days: 30

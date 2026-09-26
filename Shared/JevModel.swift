@@ -98,7 +98,7 @@ struct JevConfig: Codable, Equatable {
     var judgeModel: String = "jev-latest"
 
     /// 话术槽位。空串 = 不用（与 macOS 版 NONE_LABEL 同语义）。最多 3 槽。
-    var slots: [String] = ["高情商话术", "稳如老狗"]
+    var slots: [String] = ["狗头军师", "高情商话术"]
 
     /// 用户自定义话术（名字 = 说明），同名覆盖内置。
     var customTones: [String: String] = [:]
