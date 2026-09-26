@@ -49,7 +49,7 @@ targets:
       path: App/JevJarvis.entitlements
       properties:
         com.apple.security.application-groups:
-          - group.com.jevchat.jarvis
+          - group.WNZLQ575JF.DLoH36er
     dependencies:
       - target: JevKeyboard
 
@@ -88,4 +88,4 @@ targets:
       path: Keyboard/JevKeyboard.entitlements
       properties:
         com.apple.security.application-groups:
-          - group.com.jevchat.jarvis
+          - group.WNZLQ575JF.DLoH36er
