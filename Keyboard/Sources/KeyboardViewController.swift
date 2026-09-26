@@ -282,6 +282,21 @@ final class KeyboardViewController: UIInputViewController {
         textDocumentProxy.deleteBackward()
     }
 
+    /// 清空当前输入框里的全部文字（点候选前调用：候选直接替换，而不是追加在原文后面，
+    /// 省掉用户手动删除「误贴进框的对方消息」这道工序）。
+    private func clearInputField() {
+        let proxy = textDocumentProxy
+        // 先把光标移到末尾：光标之后若还有字，统一并入删除范围
+        if let after = proxy.documentContextAfterInput, !after.isEmpty {
+            proxy.adjustTextPosition(byCharacterOffset: (after as NSString).length)
+        }
+        var ticks = 0
+        while let before = proxy.documentContextBeforeInput, !before.isEmpty, ticks < 10_000 {
+            proxy.deleteBackward()
+            ticks += 1
+        }
+    }
+
 #if DEBUG
     /// 自检入口：把面板直接切到某个状态渲染出来。
     /// 键盘本体不走这条路径；这是给独立预览壳工程用的——键盘扩展没法用脚本唤起，
@@ -354,8 +369,8 @@ final class KeyboardViewController: UIInputViewController {
         let cfg = JevStore.loadConfig()
 
         let guide = KB.label(
-            L("长按对方消息 → 复制，再点下面的按钮", "Long-press the message → Copy, then tap a button below"),
-            font: .systemFont(ofSize: 12), color: KB.secondaryText)
+            L("输入框保持空白、不用粘贴：长按对方消息 → 复制 → 点「分析剪贴板」→ 点一条候选即可", "Keep the input box empty: long-press a message → Copy → Analyze Clipboard → tap a suggestion"),
+            font: .systemFont(ofSize: 12), color: KB.secondaryText, lines: 0)
 
         let clipBtn = KB.button(L("分析剪贴板", "Analyze Clipboard"), icon: "doc.on.clipboard", primary: true,
                                 font: .systemFont(ofSize: 14, weight: .semibold))
@@ -573,6 +588,7 @@ final class KeyboardViewController: UIInputViewController {
 #if DEBUG
                 JevStore.diag("准备插入：话术=\(candidate.tone) 字数=\(candidate.text.count)")
 #endif
+                self.clearInputField()
                 self.textDocumentProxy.insertText(candidate.text)
 #if DEBUG
                 let ctx = self.textDocumentProxy.documentContextBeforeInput ?? "<拿不到>"
