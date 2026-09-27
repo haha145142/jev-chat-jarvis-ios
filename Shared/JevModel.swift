@@ -155,7 +155,18 @@ enum JevStore {
     }
 
     static func loadConfig() -> JevConfig {
-        if var cfg = decodeConfig(groupDefaults) {
+        let groupCfg = decodeConfig(groupDefaults)
+        let privateCfg = decodeConfig(privateDefaults)
+        if var cfg = groupCfg ?? privateCfg {
+            // 双保险：另一个容器里若有这边没有的自定义话术，合并进来
+            let other = groupCfg == nil ? nil : privateCfg
+            if let other, other.customTones != cfg.customTones {
+                var changed = false
+                for (k, v) in other.customTones where cfg.customTones[k] == nil {
+                    cfg.customTones[k] = v; changed = true
+                }
+                if changed { saveConfig(cfg) }
+            }
             if cfg.genBase == removedGenerationBase {
                 let preset = ProviderPreset.all.first { $0.id == "zhipu" }
                 cfg.genKind = preset?.kind ?? .openai
@@ -167,7 +178,6 @@ enum JevStore {
             }
             return cfg
         }
-        if let cfg = decodeConfig(privateDefaults) { return cfg }
         return JevConfig()
     }
 
@@ -196,6 +206,22 @@ enum JevStore {
             .trimmingCharacters(in: .whitespacesAndNewlines),
               let data = s.data(using: .utf8),
               let cfg = try? JSONDecoder().decode(JevConfig.self, from: data) else { return false }
+        saveConfig(cfg)
+        return true
+    }
+
+    /// 静默自动导入：剪贴板是配置 JSON 且与当前存的不同才保存。
+    /// 复制的聊天消息解码不成 JevConfig，会被自然忽略，不影响分析。
+    /// 解决「全能签多开改了键盘 bundle ID、App Group 实际读不到」时自定义话术不同步的问题。
+    @discardableResult
+    static func autoImportConfigFromPasteboard() -> Bool {
+        guard let s = UIPasteboard.general.string?
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+              let data = s.data(using: .utf8),
+              let cfg = try? JSONDecoder().decode(JevConfig.self, from: data) else { return false }
+        let current = loadConfig()
+        // 只有真有差异（多了话术、改了槽位或 Key）才落盘，避免重复写。
+        guard cfg != current else { return false }
         saveConfig(cfg)
         return true
     }

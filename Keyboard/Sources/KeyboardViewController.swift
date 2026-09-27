@@ -421,7 +421,11 @@ final class KeyboardViewController: UIInputViewController {
 
     // MARK: 话术选择视图（直接在键盘上配）
 
-    @objc private func openTonePicker() { setMode(.tones) }
+    @objc private func openTonePicker() {
+        // 自动同步主 App「复制配置」的内容（自定义话术/槽位），读不到 App Group 时也能更新
+        if hasFullAccess { JevStore.autoImportConfigFromPasteboard() }
+        setMode(.tones)
+    }
 
     /// 话术选择：内置 + 自定义全列出来，点一下选中/取消，最多 3 个槽。
     /// 每次从共享配置重新读（App 那边改过也能立刻看到），选中即落盘，下一次分析就生效。
@@ -455,6 +459,11 @@ final class KeyboardViewController: UIInputViewController {
             blocks.append(gridRow(cells))
         }
 
+        let update = KB.button(L("从剪贴板更新话术", "Update tones from clipboard"), icon: "square.and.arrow.down", primary: false)
+        update.heightAnchor.constraint(equalToConstant: 34).isActive = true
+        update.addTarget(self, action: #selector(updateTonesFromClipboard), for: .touchUpInside)
+        blocks.append(update)
+
         let done = KB.button(L("好了", "Done"), icon: "checkmark", primary: true)
         done.heightAnchor.constraint(equalToConstant: 36).isActive = true
         done.addTarget(self, action: #selector(backToIdle), for: .touchUpInside)
@@ -473,6 +482,22 @@ final class KeyboardViewController: UIInputViewController {
         s.spacing = 6
         s.distribution = .fillEqually
         return s
+    }
+
+    /// 话术页手动更新：主 App「复制配置」后点这里，自定义话术立刻出现
+    @objc private func updateTonesFromClipboard() {
+        guard hasFullAccess else { setMode(.gate); return }
+        let imported = JevStore.autoImportConfigFromPasteboard()
+        render()
+        if !imported {
+            let alert = UIAlertController(
+                title: L("没有新配置", "No new config"),
+                message: L("剪贴板里没有更新的配置。请先打开 Jev Jarvis App →「开始」页点「复制配置到剪贴板」，再回来点这个按钮。",
+                           "The clipboard has no newer config. Open Jev Jarvis → Setup → Copy Config, then tap this button again."),
+                preferredStyle: .alert)
+            alert.addAction(UIAlertAction(title: L("好", "OK"), style: .default))
+            present(alert, animated: true)
+        }
     }
 
     @objc private func toneChipTapped(_ sender: UIButton) {
