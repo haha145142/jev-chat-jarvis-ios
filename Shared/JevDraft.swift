@@ -48,20 +48,69 @@ final class JevDraft {
 
     // MARK: 起草
 
-    /// 一个话术一次调用，返回 2 条候选（前稳后放）。失败抛错，由管线层归拢。
-    func draft(message: String, intent: String?, context: String?,
+    /// 一次调用返回 2 条候选（前稳后放）。judgeGuide=判断层给的意图/动作/风险参考。
+    func draft(message: String, judgeGuide: String = "", context: String?,
                knowledge: String = "",
                tone: String, instruction: String) async throws -> [String] {
-        let prompt = buildDraftPrompt(message: message, intent: intent, context: context,
-                                      knowledge: knowledge,
-                                      tone: tone, instruction: instruction, n: PER_TONE)
-        let raw = try await call(prompt: prompt)
-        let lines = CandidateParser.parse(raw)
+        let system = Self.systemPrompt(tone: tone, instruction: instruction)
+        let user = Self.userPrompt(message: message, judgeGuide: judgeGuide,
+                                   context: context, knowledge: knowledge)
+        let raw = try await call(system: system, user: user)
+        let lines = Self.parseCandidates(raw)
         if lines.isEmpty { throw JevError.emptyReply }
         return lines
     }
 
+    /// 系统提示：人设 + 官方军师规则 + JSON 数组输出约束（对齐 GoutouGuidance.draftRules）。
+    private static func systemPrompt(tone: String, instruction: String) -> String {
+        """
+        你是狗头军师 Jev Chat 的即时通讯回复助手。
+        当前话术人设：「\(tone)」\(instruction)
+        狗头军师规则：
+        - 先区分可见事实、暂定推测与仍未知；一轮回复只做一个主动作
+        - 对方意图只是可能的解释，别在回复里宣称看穿了 TA
+        - 尊重拒绝与边界，不使用操控、施压、贬低或虚假时间限制
+        - 不编造见面时间、共同经历、自己做过的事或做不到的承诺
+        - 回复像用户平时发的一句话；不把分析术语、理由、代价塞进可发送文本
+        只输出一个 JSON 数组，包含 \(PER_TONE) 条候选：前一条稳妥周全可直接发，后一条更直接或更轻松；每条不超过 40 字，口语自然。不要解释，不要输出数组以外的任何内容。
+        """
+    }
+
+    /// 用户消息：知识依据 + 判断参考 + 最近对话 + 待回消息。
+    private static func userPrompt(message: String, judgeGuide: String,
+                                   context: String?, knowledge: String) -> String {
+        var p = ""
+        if !knowledge.isEmpty {
+            p += "以下关系原则与方法是回复依据：回复必须与之一致，可直接化用其中的事实与做法；不要编造这里没有的东西，也不要照抄或提及资料本身。\n\(knowledge)\n\n"
+        }
+        if !judgeGuide.isEmpty { p += judgeGuide + "\n" }
+        if let c = context, !c.isEmpty { p += "最近的对话：\n\(c)\n\n" }
+        p += "消息：「\(message)」\n请给出 \(PER_TONE) 条候选回复的 JSON 数组。"
+        return p
+    }
+
+    /// 解析候选：优先 JSON 数组，失败再按行解析（对齐官方 parseThree）。
+    static func parseCandidates(_ raw: String) -> [String] {
+        if let lb = raw.range(of: "["),
+           let rb = raw.range(of: "]", range: lb.upperBound..<raw.endIndex) {
+            let piece = String(raw[lb.lowerBound...rb.upperBound])
+            if let data = piece.data(using: .utf8),
+               let arr = try? JSONSerialization.jsonObject(with: data) as? [Any] {
+                let texts = arr.compactMap { $0 as? String }
+                    .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                    .filter { !$0.isEmpty }
+                if !texts.isEmpty { return Array(texts.prefix(PER_TONE)) }
+            }
+        }
+        return CandidateParser.parse(raw)
+    }
+
+    /// 连通性测试用：单轮对话。
     func call(prompt: String) async throws -> String {
+        try await call(system: "你是连通性测试助手，只按要求回答，不要解释。", user: prompt)
+    }
+
+    func call(system: String, user: String) async throws -> String {
         let g = cfg.generation
         let url = Self.chatURL(g.base, kind: g.kind)
         var body: [String: Any]
@@ -70,18 +119,22 @@ final class JevDraft {
         case .openai:
             body = [
                 "model": g.model,
-                "messages": [["role": "user", "content": prompt]],
-                "max_tokens": 400,
-                "temperature": Self.temperature,
+                "messages": [
+                    ["role": "system", "content": system],
+                    ["role": "user", "content": user],
+                ],
+                "max_tokens": 500,
+                "temperature": 0.8,
                 "stream": false,
             ]
             headers["Authorization"] = "Bearer \(g.key)"
         case .anthropic:
             body = [
                 "model": g.model,
-                "max_tokens": 400,
-                "temperature": Self.temperature,
-                "messages": [["role": "user", "content": prompt]],
+                "system": system,
+                "max_tokens": 500,
+                "temperature": 0.8,
+                "messages": [["role": "user", "content": user]],
             ]
             headers["x-api-key"] = g.key
             headers["anthropic-version"] = "2023-06-01"

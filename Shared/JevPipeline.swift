@@ -110,8 +110,14 @@ final class JevPipeline {
             return out
         }
 
-        // 判断命中缓存时，第一轮就直接带意图（不用等，也没损失）
-        let firstIntent = judgeResult?.intent
+        // 判断命中缓存时，第一轮就直接带判断参考（不用等，也没损失）
+        func guide(_ jr: JudgeResult?) -> String {
+            guard let jr else { return "" }
+            let action = jr.actions.first ?? "未知"
+            return String(format: "军师判断参考（模型推测，非已证实事实）：意图=%@；建议动作=%@；风险=%.0f/9。",
+                         jr.intent, action, jr.risk)
+        }
+        let firstGuide = guide(judgeResult)
         func partial(with round: DraftRound, judge: JudgeResult?, extraNotices: [String] = []) -> Analysis {
             var p = out
             p.judge = judge
@@ -123,7 +129,7 @@ final class JevPipeline {
         }
 
         onStage?(.drafting(done: 0, total: active.count))
-        var round = await draftRound(active: active, msg: msg, intent: firstIntent, context: context,
+        var round = await draftRound(active: active, msg: msg, judgeGuide: firstGuide, context: context,
                                      knowledge: knowledge,
                                      onStage: onStage) { r in
             onPartial?(partial(with: r, judge: JevJudgeCache.shared.get(message: msg, context: context)))
@@ -141,9 +147,9 @@ final class JevPipeline {
         }
 
         // 2b) 高风险消息才用意图重写一版：盲起草在平常用消息上够用，风险高的才值得多花一次往返。
-        if let jr = judgeResult, firstIntent == nil, jr.risk >= Self.refineRiskThreshold, !drafted.isEmpty {
+        if let jr = judgeResult, firstGuide.isEmpty, jr.risk >= Self.refineRiskThreshold, !drafted.isEmpty {
             let note = String(format: "风险 %.0f/9：已按判断重写一版候选", jr.risk)
-            round = await draftRound(active: active, msg: msg, intent: jr.intent, context: context,
+            round = await draftRound(active: active, msg: msg, judgeGuide: guide(jr), context: context,
                                      knowledge: knowledge,
                                      onStage: onStage) { r in
                 onPartial?(partial(with: r, judge: jr, extraNotices: [note]))
@@ -213,8 +219,8 @@ final class JevPipeline {
     }
 
     /// 跑一轮起草：每个话术一次请求（并发），每完成一个就把"到目前为止的候选"交给界面。
-    private func draftRound(active: [(String, String)], msg: String, intent: String?, context: String?,
-                            knowledge: String,
+    private func draftRound(active: [(String, String)], msg: String, judgeGuide: String,
+                            context: String?, knowledge: String,
                             onStage: ((PipelineStage) -> Void)?,
                             onPartial: @escaping (DraftRound) -> Void) async -> DraftRound {
         var round = DraftRound()
@@ -223,7 +229,7 @@ final class JevPipeline {
                 group.addTask {
                     do {
                         let texts = try await self.draft.draft(
-                            message: msg, intent: intent, context: context,
+                            message: msg, judgeGuide: judgeGuide, context: context,
                             knowledge: knowledge,
                             tone: name, instruction: instruction)
                         return (name, texts, nil)

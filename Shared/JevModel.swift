@@ -128,6 +128,8 @@ struct KeyboardStatus: Codable, Equatable {
 enum JevStore {
     static let appGroupID = "group.WNZLQ575JF.DLoH36er"
     private static let configKey = "jev.config.v1"
+    /// 自定义话术独立副本：配置块同步出问题时，话术仍能单独到达键盘
+    private static let customTonesKey = "jev.customTones.v1"
     private static let removedGenerationBase = "http://101.132.131.220:11111/v1"
     private static let statusKey = "jev.kbstatus.v1"
     private static let canaryKey = "jev.canary.v1"
@@ -158,6 +160,10 @@ enum JevStore {
         let groupCfg = decodeConfig(groupDefaults)
         let privateCfg = decodeConfig(privateDefaults)
         if var cfg = groupCfg ?? privateCfg {
+            // 独立副本里的话术也合并进来（配置块没带到时的兜底）
+            for (k, v) in loadCustomTonesStandalone() where cfg.customTones[k] == nil {
+                cfg.customTones[k] = v
+            }
             // 双保险：另一个容器里若有这边没有的自定义话术，合并进来
             let other = groupCfg == nil ? nil : privateCfg
             if let other, other.customTones != cfg.customTones {
@@ -186,6 +192,28 @@ enum JevStore {
             groupDefaults.set(data, forKey: configKey)
             privateDefaults.set(data, forKey: configKey)
         }
+    }
+
+    // MARK: 自定义话术独立存储（不依赖配置块，多通道保证到达键盘）
+
+    static func saveCustomTonesStandalone(_ tones: [String: String]) {
+        let clean = tones.filter { $0 != NONE_LABEL && !$1.isEmpty }
+        if let data = try? JSONEncoder().encode(clean) {
+            groupDefaults.set(data, forKey: customTonesKey)
+            privateDefaults.set(data, forKey: customTonesKey)
+        }
+    }
+
+    /// 合并 group + private 两个独立副本
+    static func loadCustomTonesStandalone() -> [String: String] {
+        var out: [String: String] = [:]
+        for store in [groupDefaults, privateDefaults] {
+            if let data = store.data(forKey: customTonesKey),
+               let t = try? JSONDecoder().decode([String: String].self, from: data) {
+                for (k, v) in t where out[k] == nil { out[k] = v }
+            }
+        }
+        return out
     }
 
     // MARK: 无 App Group 时的配置搬运（全能签等第三方证书）
@@ -223,6 +251,7 @@ enum JevStore {
         // 只有真有差异（多了话术、改了槽位或 Key）才落盘，避免重复写。
         guard cfg != current else { return false }
         saveConfig(cfg)
+        saveCustomTonesStandalone(cfg.customTones)
         return true
     }
 

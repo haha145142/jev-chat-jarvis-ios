@@ -115,6 +115,7 @@ private struct AddToneView: View {
                         let d = desc.trimmingCharacters(in: .whitespaces)
                         guard !n.isEmpty, !d.isEmpty, n != NONE_LABEL else { return }
                         store.config.customTones[n] = d
+                        JevStore.saveCustomTonesStandalone(store.config.customTones)
                         dismiss()
                     }
                     .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty ||
