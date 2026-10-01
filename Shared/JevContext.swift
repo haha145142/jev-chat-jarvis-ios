@@ -255,12 +255,9 @@ final class JevContextStore {
                 return name + sep + turn.text
             }
             let title = language == .english ? "Recent conversation:\n" : "最近的对话：\n"
-            blocks.append(title + lines.joined(separator: "
-"))
+            blocks.append(title + lines.joined(separator: "\n"))
         }
-        return blocks.joined(separator: "
-
-")
+        return blocks.joined(separator: "\n\n")
     }
 
     // MARK: 状态摘要
