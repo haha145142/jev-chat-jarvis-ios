@@ -10,6 +10,9 @@ import Foundation
 //   · 常驻笔记：写一段背景（两人关系、前情提要），每次分析都带上。
 // 生成出的文本通过 JevPipeline 的 context 参数注入（见 JevPrompts / JevJudge）。
 
+/// 换行符（用码位构造，避免在源码里写反斜杠转义）。
+private let jevNL = String(Character(UnicodeScalar(10)!))
+
 /// 一条对话。
 struct ChatTurn: Codable, Equatable, Identifiable {
     enum Speaker: String, Codable {
@@ -246,7 +249,7 @@ final class JevContextStore {
         var blocks: [String] = []
         let note = settings.standingNote.trimmingCharacters(in: .whitespacesAndNewlines)
         if !note.isEmpty {
-            blocks.append((language == .english ? "Background:\n" : "背景：") + note)
+            blocks.append((language == .english ? "Background:" + jevNL : "背景：") + note)
         }
         if !t.isEmpty {
             let lines = t.map { turn -> String in
@@ -254,10 +257,10 @@ final class JevContextStore {
                 let sep = language == .english ? ": " : "："
                 return name + sep + turn.text
             }
-            let title = language == .english ? "Recent conversation:\n" : "最近的对话：\n"
-            blocks.append(title + lines.joined(separator: "\n"))
+            let title = language == .english ? "Recent conversation:" + jevNL : "最近的对话：" + jevNL
+            blocks.append(title + lines.joined(separator: jevNL))
         }
-        return blocks.joined(separator: "\n\n")
+        return blocks.joined(separator: jevNL + jevNL)
     }
 
     // MARK: 状态摘要
