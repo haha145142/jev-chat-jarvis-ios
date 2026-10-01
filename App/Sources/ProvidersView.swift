@@ -222,7 +222,7 @@ private struct TestConnectionButton: View {
     private func test() {
         // 先把键盘收掉：不然结果被键盘挡着，也会出现"点测试反而把键盘带出来"的观感
         UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder),
-                                        to: nil, from: nil, forKey: nil)
+                                        to: nil, from: nil, for: nil)
         running = true
         result = nil
         let cfg = store.config
