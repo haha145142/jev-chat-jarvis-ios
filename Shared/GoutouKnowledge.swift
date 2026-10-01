@@ -86,7 +86,7 @@ enum GoutouKnowledge {
 
     // MARK: 资源定位（App 主包 / 键盘扩展包都可能是宿主）
 
-    private static var folderURL: URL? {
+    static var folderURL: URL? {
         var bundles: [Bundle] = [Bundle.main]
         bundles += Bundle.allBundles.filter { $0.bundlePath.contains(".appex") }
         for b in bundles {
