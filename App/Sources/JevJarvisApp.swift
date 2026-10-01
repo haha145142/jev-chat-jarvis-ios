@@ -11,7 +11,6 @@ final class ConfigStore: ObservableObject {
     }
 
     init() {
-        JevNoteStore.seedIfNeeded()
         config = JevStore.loadConfig()
         language = JevStore.loadLanguage()
     }
@@ -42,8 +41,8 @@ struct JevJarvisApp: App {
                     .tabItem { Label(jevLocalized(store.language, zh: "模型", en: "Models"), systemImage: "brain.head.profile") }
                 TonesView()
                     .tabItem { Label(jevLocalized(store.language, zh: "话术", en: "Tones"), systemImage: "theatermasks") }
-                NotesView()
-                    .tabItem { Label(jevLocalized(store.language, zh: "知识库", en: "Notes"), systemImage: "books.vertical") }
+                ContextView()
+                    .tabItem { Label(jevLocalized(store.language, zh: "上下文", en: "Context"), systemImage: "bubble.left.and.bubble.right") }
                 PlaygroundView()
                     .tabItem { Label(jevLocalized(store.language, zh: "试一试", en: "Try it"), systemImage: "flask") }
             }
