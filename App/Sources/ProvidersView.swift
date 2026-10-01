@@ -8,10 +8,34 @@ struct ProvidersView: View {
     var body: some View {
         NavigationStack {
             Form {
+                knowledgeSection
                 judgeSection
                 generationSection
             }
             .navigationTitle(jevLocalized(store.language, zh: "模型", en: "Models"))
+        }
+    }
+
+    // MARK: 内置技能（狗头军师 · 恋爱大师）
+
+    @State private var knowledgeOn: Bool = JevStore.knowledgeEnabled
+
+    private var knowledgeSection: some View {
+        Section {
+            Toggle(jevLocalized(store.language, zh: "自动携带恋爱知识库", en: "Auto include love knowledge"),
+                   isOn: $knowledgeOn)
+                .onChange(of: knowledgeOn) { JevStore.knowledgeEnabled = $0 }
+            NavigationLink {
+                KnowledgeBrowserView()
+            } label: {
+                Text(jevLocalized(store.language, zh: "查看内置知识库内容", en: "View built-in knowledge"))
+            }
+        } header: {
+            Text(jevLocalized(store.language, zh: "内置技能（狗头军师 · 恋爱大师）", en: "Built-in skills (Goutou · Love Coach)"))
+        } footer: {
+            Text(jevLocalized(store.language,
+                zh: "开启后，每次分析自动把「先接住情绪 → 分清事实 → 给下一步 → 停止条件」的判断逻辑附到判断层与生成层；消息命中方法库时，还会按需带上狗头军师文献与恋爱大师的阶段打法。内容蒸馏自开源项目「狗头军师」（github.com/shengjidaguai-china/goutoujunshi，含 20 篇知识与精选实战）与「恋爱大师」（github.com/tomwong001/qingsheng-skill），均为 MIT 协议。",
+                en: "When on, each analysis attaches the Goutou framework and Love Coach stage tactics. Distilled from the open-source projects Goutoujunshi and qingsheng-skill (both MIT)."))
         }
     }
 
@@ -198,7 +222,7 @@ private struct TestConnectionButton: View {
     private func test() {
         // 先把键盘收掉：不然结果被键盘挡着，也会出现"点测试反而把键盘带出来"的观感
         UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder),
-                                        to: nil, from: nil, for: nil)
+                                        to: nil, from: nil, forKey: nil)
         running = true
         result = nil
         let cfg = store.config
