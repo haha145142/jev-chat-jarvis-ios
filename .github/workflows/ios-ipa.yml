@@ -26,40 +26,52 @@ jobs:
       - name: Show build environment
         run: xcodebuild -version && swift --version
 
-      # 关键：无论成败都把完整日志落盘，并抽出 error 行；本步骤不直接让任务失败。
+      # 关键：无论成败都把完整日志落盘，并抽出 error 行；用固定 derivedDataPath 便于定位产物。
       - name: Build (no signing, capture log)
         id: build
         run: |
           set +e
-          xcodebuild -project JevJarvis.xcodeproj -scheme JevJarvis -sdk iphoneos -configuration Release -destination 'generic/platform=iOS' CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" ONLY_ACTIVE_ARCH=NO build > buildlog.txt 2>&1
+          xcodebuild -project JevJarvis.xcodeproj \
+            -scheme JevJarvis \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+            build > buildlog.txt 2>&1
           echo "code=$?" >> "$GITHUB_OUTPUT"
           grep -nE "error:|fatal error:|cannot find|has no member|is ambiguous|missing argument|extra argument" buildlog.txt > builderrors.txt || true
           echo "----- extracted errors -----"
           cat builderrors.txt || true
           echo "----------------------------"
 
-      # 无论编译成功还是失败，都确保有 Release 并上传日志（公开可下载）。
+      # 无论成败都确保有 Release 并上传日志（公开可下载）。加重试，且永不阻断后续步骤。
       - name: Publish diagnostics to Release
         if: always()
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           TAG="v1.4-context"
-          if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release upload "$TAG" buildlog.txt builderrors.txt --clobber
-          else
-            gh release create "$TAG" buildlog.txt builderrors.txt --title "iPhone 聊天助手（含多轮上下文）" --notes "构建日志见附件。"
-          fi
+          gh release view "$TAG" >/dev/null 2>&1 || gh release create "$TAG" --title "iPhone 聊天助手（含多轮上下文）" --notes "见附件 IPA 与构建日志。"
+          for f in buildlog.txt builderrors.txt; do
+            ok=0
+            for i in 1 2 3 4 5; do
+              if gh release upload "$TAG" "$f" --clobber; then ok=1; break; fi
+              echo "upload $f attempt $i failed, retrying..."; sleep 3
+            done
+            if [ "$ok" = "0" ]; then echo "WARN: could not upload $f"; fi
+          done
+          true
 
-      # 编译失败则在此明确失败、终止后续打包。
+      # 编译失败则明确失败、终止打包。
       - name: Assert build succeeded
         run: test "${{ steps.build.outputs.code }}" = "0"
 
       - name: Locate app & verify keyboard extension
         id: locate
         run: |
-          APP_PATH=$(find "$HOME/Library/Developer/Xcode/DerivedData" -name 'JevJarvis.app' -type d -path '*Release-iphoneos*' | head -1)
-          echo "Found: $APP_PATH"
+          APP_PATH=$(find build/Build/Products/Release-iphoneos -maxdepth 1 -name "*.app" -type d | head -1)
+          echo "Built app: $APP_PATH"
           test -n "$APP_PATH"
           test -d "$APP_PATH/PlugIns/JevKeyboard.appex"
           ls -la "$APP_PATH/PlugIns"
@@ -68,17 +80,25 @@ jobs:
       - name: Package IPA
         run: |
           APP_PATH="${{ steps.locate.outputs.app_path }}"
-          mkdir -p staging/Payload
-          cp -R "$APP_PATH" staging/Payload/
-          (cd staging && zip -qr ../JevJarvis-unsigned.ipa Payload)
-          unzip -l JevJarvis-unsigned.ipa | head -20
+          rm -rf Payload
+          mkdir Payload
+          cp -R "$APP_PATH" Payload/
+          rm -f JevJarvis-unsigned.ipa
+          zip -qr JevJarvis-unsigned.ipa Payload
+          unzip -l JevJarvis-unsigned.ipa | head -25
 
       - name: Publish IPA to GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           TAG="v1.4-context"
-          gh release upload "$TAG" JevJarvis-unsigned.ipa --clobber
+          for i in 1 2 3 4 5 6; do
+            if gh release upload "$TAG" JevJarvis-unsigned.ipa --clobber; then
+              echo "IPA uploaded"; exit 0
+            fi
+            echo "IPA upload attempt $i failed, retrying..."; sleep 4
+          done
+          echo "ERROR: failed to publish IPA"; exit 1
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
