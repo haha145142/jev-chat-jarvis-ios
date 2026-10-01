@@ -1,0 +1,66 @@
+name: Build iOS IPA
+
+# 在云端 Mac 上编译「未签名 IPA」并发到 Release，方便用全能签等工具签名安装。
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build & release unsigned IPA
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Regenerate Xcode project
+        run: xcodegen generate
+
+      - name: Show build environment
+        run: xcodebuild -version && swift --version
+
+      - name: Build (no signing)
+        run: xcodebuild -project JevJarvis.xcodeproj -scheme JevJarvis -sdk iphoneos -configuration Release -destination 'generic/platform=iOS' CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" ONLY_ACTIVE_ARCH=NO build
+
+      - name: Locate app & verify keyboard extension
+        id: locate
+        run: |
+          APP_PATH=$(find "$HOME/Library/Developer/Xcode/DerivedData" -name 'JevJarvis.app' -type d -path '*Release-iphoneos*' | head -1)
+          echo "Found: $APP_PATH"
+          test -n "$APP_PATH"
+          test -d "$APP_PATH/PlugIns/JevKeyboard.appex"
+          ls -la "$APP_PATH/PlugIns"
+          echo "app_path=$APP_PATH" >> "$GITHUB_OUTPUT"
+
+      - name: Package IPA
+        run: |
+          APP_PATH="${{ steps.locate.outputs.app_path }}"
+          mkdir -p staging/Payload
+          cp -R "$APP_PATH" staging/Payload/
+          (cd staging && zip -qr ../JevJarvis-unsigned.ipa Payload)
+          unzip -l JevJarvis-unsigned.ipa | head -20
+
+      - name: Publish to GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="v1.4-context"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" JevJarvis-unsigned.ipa --clobber
+          else
+            gh release create "$TAG" JevJarvis-unsigned.ipa --title "iPhone 聊天助手（含多轮上下文）" --notes "未签名 IPA：用全能签等工具签名后安装。本版修复了 iPhone 上只能回最后一句的问题，支持多轮上下文。"
+          fi
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: JevJarvis-unsigned-ipa
+          path: JevJarvis-unsigned.ipa
+          retention-days: 30
