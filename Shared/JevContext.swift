@@ -54,7 +54,7 @@ final class JevContextStore {
     private static let turnsKey = "jev.context.turns.v1"
     private static let settingsKey = "jev.context.settings.v1"
 
-    init(defaults: UserDefaults = JevStore.defaults) {
+    init(defaults: UserDefaults = UserDefaults(suiteName: JevStore.appGroupID) ?? .standard) {
         self.defaults = defaults
     }
 
