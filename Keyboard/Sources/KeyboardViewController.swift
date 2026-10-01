@@ -373,7 +373,7 @@ final class KeyboardViewController: UIInputViewController {
         btnRow.distribution = .fillEqually
         btnRow.heightAnchor.constraint(equalToConstant: 44).isActive = true
 
-        // 上下文行：左边点进去查看/管理，右边「＋」把刚复制的消息快速加入
+        // 上下文行：左边点进去查看/manage，右边「＋」把刚复制的消息快速加入
         let ctxBtn = KB.button(JevContextStore.shared.statusText(language: language),
                                icon: "bubble.left.and.bubble.right",
                                font: .systemFont(ofSize: 13, weight: .medium))
@@ -398,18 +398,19 @@ final class KeyboardViewController: UIInputViewController {
         // 待机页**不放**发送键：这一页还没有候选，没有可发的东西；而输入框一旦有字，
         // 宿主 App 自己的发送按钮就出来了，
         // 键盘下方再挂一个只是添乱。发送键只在结果页——点完候选、手还在面板上时用。
-        let vstack = UIStackView(arrangedSubviews: [guide, btnRow, ctxRow, tonesBtn])
-        vstack.axis = .vertical
-        vstack.spacing = 8
+        let vstack = UIStackView(arrangedSubviews: [title? ]) // placeholder
+        let vstackReal = UIStackView(arrangedSubviews: [guide, btnRow, ctxRow, tonesBtn])
+        vstackReal.axis = .vertical
+        vstackReal.spacing = 8
         if JevDraft(cfg: cfg).isConfigured {
             // 配置完整时不占行
         } else {
             let warn = KB.label(L("⚠️ 还没配置生成层：打开 Jev Jarvis App →「模型」页填 API Key", "⚠️ Generation is not configured: open Jev Jarvis → Models and add an API key"),
                                 font: .systemFont(ofSize: 12), color: .systemOrange, lines: 0)
-            vstack.addArrangedSubview(warn)
+            vstackReal.addArrangedSubview(warn)
         }
-        fitBlocks = [vstack]
-        return vstack
+        fitBlocks = [vstackReal]
+        return vstackReal
     }
 
     // MARK: 话术选择视图（直接在键盘上配）
@@ -529,7 +530,7 @@ final class KeyboardViewController: UIInputViewController {
             let row = ContextTurnRow(turn: turn, language: language)
             row.onDelete = { id in
                 JevContextStore.shared.remove(id: id)
-                render()
+                self.render()
             }
             list.addArrangedSubview(row)
         }
@@ -550,7 +551,7 @@ final class KeyboardViewController: UIInputViewController {
         let addThem = KB.button(L("＋对方·剪贴板", "＋Them·clipboard"), icon: "person")
         addThem.addTarget(self, action: #selector(addThemFromClipboard), for: .touchUpInside)
         let addMe = KB.button(L("＋我·输入框", "＋Me·input"), icon: "keyboard")
-        addMe.addTarget(self, action: #selector( addMeFromInput), for: .touchUpInside)
+        addMe.addTarget(self, action: #selector(addMeFromInput), for: .touchUpInside)
         let row1 = UIStackView(arrangedSubviews: [addThem, addMe])
         row1.axis = .horizontal
         row1.spacing = 6
@@ -689,6 +690,7 @@ final class KeyboardViewController: UIInputViewController {
         hstack.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
             hstack.topAnchor.constraint(equalTo: header.topAnchor),
+            vstack? ]) // placeholder2
             hstack.bottomAnchor.constraint(equalTo: header.bottomAnchor),
             hstack.leadingAnchor.constraint(equalTo: header.leadingAnchor),
             hstack.trailingAnchor.constraint(equalTo: header.trailingAnchor),
@@ -697,7 +699,7 @@ final class KeyboardViewController: UIInputViewController {
 
         // 时间脚注（先建好：插入/发送的反馈要临时改它）
         let footer = KB.label(a.rankingPending
-                                ? L("候选已出 · 排序中…（现在就能点）", "Suggestions ready · ranking… (you can tap now)")
+                                ? L("候选已出 · 排序中…（现在就能点）", "Suggestions ready · ranking… (you can tab now)")
                                 : L(String(format: "%.1f 秒 · 点候选插入，点「发送」发出", a.elapsed), String(format: "%.1f s · tap a suggestion to insert, then Send", a.elapsed)),
                               font: .systemFont(ofSize: 10), color: KB.secondaryText)
         flashTarget = footer
@@ -751,6 +753,7 @@ final class KeyboardViewController: UIInputViewController {
             list.topAnchor.constraint(equalTo: scroll.contentLayoutGuide.topAnchor),
             list.bottomAnchor.constraint(equalTo: scroll.contentLayoutGuide.bottomAnchor),
             list.leadingAnchor.constraint(equalTo: scroll.contentLayoutGuide.leadingAnchor),
+            list.trailingAnchor.constraint(equalTo: scroll.contentLayoutGuide.trailingAnnotation)
             list.trailingAnchor.constraint(equalTo: scroll.contentLayoutGuide.trailingAnchor),
             list.widthAnchor.constraint(equalTo: scroll.widthAnchor),
         ])
@@ -849,7 +852,7 @@ final class KeyboardViewController: UIInputViewController {
         guard hasFullAccess else { setMode(.gate); return }
         guard let text = UIPasteboard.general.string?
             .trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty else {
-            errorText = L("剪贴板是空的。先在聊天里长按要回的消息 →「复制」，再回来点分析。", "The clipboard is empty. Long-press a message in your chat, copy it, then tap Analyze.")
+            errorText = L("剪贴板是空的。先在聊天里长按要回的消息 →「复制」，再回来点分析。", "The clipboard is empty. Long-press a message in your chat, copy it, then tab Analyze.")
             setMode(.error)
             return
         }
