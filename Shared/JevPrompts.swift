@@ -155,7 +155,7 @@ func buildDraftPrompt(message: String, intent: String?, context: String?,
     let knowledgeLine: String
     if selectedLanguage == .english {
         contextLine = context != nil && !(context ?? "").isEmpty ? "Recent conversation:\n\(context!)\n\n" : ""
-        intentLine = intent != nil && !(intent ?? "").isEmpty ? "Detected intent: \(localizedIntent(intent!, language: .english))\n" : ""
+        intentLine = intent != nil && !(intent ?? "").isEmpty ? "Detected intent: \(intent!)\n" : ""
         knowledgeLine = knowledge.isEmpty ? "" : "Background knowledge (principles and methods): use it to judge the situation and shape your reply; apply it silently—do not quote or mention:\n\(knowledge)\n"
     } else {
         contextLine = context != nil && !(context ?? "").isEmpty ? "最近的对话：\n\(context!)\n\n" : ""
@@ -193,8 +193,12 @@ enum CandidateParser {
         return String(s[r.upperBound...])
     }
 
+    private static func ch(_ v: Int) -> Character { Character(UnicodeScalar(v)!) }
+
     private static let quotePairs: [(Character, Character)] = [
-        ("\"", "\""), ("'", "'"), (““”, “””), (“‘”, “’”), (“「”, “」”), (“『”, “』”),
+        (ch(34), ch(34)), (ch(39), ch(39)),
+        (ch(0x201C), ch(0x201D)), (ch(0x2018), ch(0x2019)),
+        ("「", "」"), ("『", "』"),
     ]
 
     private static func stripQuotes(_ s: String) -> String {
