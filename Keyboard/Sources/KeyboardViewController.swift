@@ -398,19 +398,18 @@ final class KeyboardViewController: UIInputViewController {
         // 待机页**不放**发送键：这一页还没有候选，没有可发的东西；而输入框一旦有字，
         // 宿主 App 自己的发送按钮就出来了，
         // 键盘下方再挂一个只是添乱。发送键只在结果页——点完候选、手还在面板上时用。
-        let vstack = UIStackView(arrangedSubviews: [title? ]) // placeholder
-        let vstackReal = UIStackView(arrangedSubviews: [guide, btnRow, ctxRow, tonesBtn])
-        vstackReal.axis = .vertical
-        vstackReal.spacing = 8
+        let vstack = UIStackView(arrangedSubviews: [guide, btnRow, ctxRow, tonesBtn])
+        vstack.axis = .vertical
+        vstack.spacing = 8
         if JevDraft(cfg: cfg).isConfigured {
             // 配置完整时不占行
         } else {
             let warn = KB.label(L("⚠️ 还没配置生成层：打开 Jev Jarvis App →「模型」页填 API Key", "⚠️ Generation is not configured: open Jev Jarvis → Models and add an API key"),
                                 font: .systemFont(ofSize: 12), color: .systemOrange, lines: 0)
-            vstackReal.addArrangedSubview(warn)
+            vstack.addArrangedSubview(warn)
         }
-        fitBlocks = [vstackReal]
-        return vstackReal
+        fitBlocks = [vstack]
+        return vstack
     }
 
     // MARK: 话术选择视图（直接在键盘上配）
@@ -690,7 +689,6 @@ final class KeyboardViewController: UIInputViewController {
         hstack.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
             hstack.topAnchor.constraint(equalTo: header.topAnchor),
-            vstack? ]) // placeholder2
             hstack.bottomAnchor.constraint(equalTo: header.bottomAnchor),
             hstack.leadingAnchor.constraint(equalTo: header.leadingAnchor),
             hstack.trailingAnchor.constraint(equalTo: header.trailingAnchor),
@@ -753,7 +751,6 @@ final class KeyboardViewController: UIInputViewController {
             list.topAnchor.constraint(equalTo: scroll.contentLayoutGuide.topAnchor),
             list.bottomAnchor.constraint(equalTo: scroll.contentLayoutGuide.bottomAnchor),
             list.leadingAnchor.constraint(equalTo: scroll.contentLayoutGuide.leadingAnchor),
-            list.trailingAnchor.constraint(equalTo: scroll.contentLayoutGuide.trailingAnnotation)
             list.trailingAnchor.constraint(equalTo: scroll.contentLayoutGuide.trailingAnchor),
             list.widthAnchor.constraint(equalTo: scroll.widthAnchor),
         ])
