@@ -17,7 +17,7 @@ final class KeyboardViewController: UIInputViewController {
         jevLocalized(language, zh: zh, en: en)
     }
 
-    private enum Mode { case gate, idle, tones, loading, result, error }
+    private enum Mode { case gate, idle, tones, context, loading, result, error }
 
     private var mode: Mode = .idle
     private var lastSource: Source = .clipboard
@@ -72,7 +72,7 @@ final class KeyboardViewController: UIInputViewController {
         let hit = view.hitTest(p, with: nil)
         JevStore.diag(String(format: "面板点按 (%.0f,%.0f) 命中=%@", p.x, p.y,
                              String(describing: type(of: hit ?? UIView())))
-            + " 状态=\(mode)")
+            + " 状态=" + String(describing: mode))
     }
 #endif
 
@@ -101,7 +101,7 @@ final class KeyboardViewController: UIInputViewController {
         guard let url = URL(string: base + "/models") else { return }
         var req = URLRequest(url: url)
         req.httpMethod = "GET"
-        req.setValue("Bearer \(g.key)", forHTTPHeaderField: "Authorization")
+        req.setValue("Bearer " + g.key, forHTTPHeaderField: "Authorization")
         req.timeoutInterval = 8
         URLSession.shared.dataTask(with: req) { _, _, _ in }.resume()
     }
@@ -257,7 +257,7 @@ final class KeyboardViewController: UIInputViewController {
         // 顶部那条「色块」的取证（1）：我们视图与直接父视图的几何关系
         let supFrame = view.superview.map { frameText($0.frame) } ?? "nil"
         let supBounds = view.superview.map { frameText($0.bounds) } ?? "nil"
-        JevStore.diag("几何 view=\(frameText(view.frame)) 父frame=\(supFrame) 父bounds=\(supBounds) 兄弟数=\(view.superview?.subviews.count ?? -1)")
+        JevStore.diag("几何 view=" + frameText(view.frame) + " 父frame=" + supFrame + " 父bounds=" + supBounds + " 兄弟数=" + String(describing: view.superview?.subviews.count ?? -1))
 
         // 取证（2）：等键盘真正铺开后再往上数三层容器——iOS 26 的键盘容器自己画圆角底衬，
         // 得知道那一层是什么类、多大、什么颜色，才能判断那条带子是它的还是我们的
@@ -267,8 +267,8 @@ final class KeyboardViewController: UIInputViewController {
             var node: UIView? = self.view
             for _ in 0..<4 {
                 guard let cur = node else { break }
-                let bg = cur.backgroundColor.map { "\($0)" } ?? "nil"
-                parts.append("\(type(of: cur)) \(frameText(cur.frame)) bg=\(bg)")
+                let bg = cur.backgroundColor.map { String(describing: $0) } ?? "nil"
+                parts.append(String(describing: type(of: cur)) + " " + frameText(cur.frame) + " bg=" + bg)
                 node = cur.superview
             }
             JevStore.diag("容器链 " + parts.joined(separator: " | "))
@@ -280,21 +280,6 @@ final class KeyboardViewController: UIInputViewController {
 
     @objc private func deleteBackwardTapped() {
         textDocumentProxy.deleteBackward()
-    }
-
-    /// 清空当前输入框里的全部文字（点候选前调用：候选直接替换，而不是追加在原文后面，
-    /// 省掉用户手动删除「误贴进框的对方消息」这道工序）。
-    private func clearInputField() {
-        let proxy = textDocumentProxy
-        // 先把光标移到末尾：光标之后若还有字，统一并入删除范围
-        if let after = proxy.documentContextAfterInput, !after.isEmpty {
-            proxy.adjustTextPosition(byCharacterOffset: (after as NSString).length)
-        }
-        var ticks = 0
-        while let before = proxy.documentContextBeforeInput, !before.isEmpty, ticks < 10_000 {
-            proxy.deleteBackward()
-            ticks += 1
-        }
     }
 
 #if DEBUG
@@ -326,6 +311,7 @@ final class KeyboardViewController: UIInputViewController {
         case .gate: contentStack.addArrangedSubview(gateView())
         case .idle: contentStack.addArrangedSubview(idleView())
         case .tones: contentStack.addArrangedSubview(tonesView())
+        case .context: contentStack.addArrangedSubview(contextView())
         case .loading: contentStack.addArrangedSubview(loadingView())
         case .result: contentStack.addArrangedSubview(resultView())
         case .error: contentStack.addArrangedSubview(errorView())
@@ -344,7 +330,7 @@ final class KeyboardViewController: UIInputViewController {
         let title = KB.label(L("需要「允许完全访问」", "Full Access required"), font: .systemFont(ofSize: 16, weight: .bold),
                              color: .systemRed)
         let steps = KB.label(
-            L("Jev 键盘要联网调用模型、读取剪贴板，这两项都要求完全访问：\n\n① 打开系统「设置」→「通用」→「键盘」→「键盘」\n② 点「添加新键盘」→ 选「Jev 键盘」\n③ 点「Jev 键盘」→ 打开「允许完全访问」\n\n完全访问意味着键盘能传输按键与剪贴板内容——本项目开源、只用你自己填的 API Key，不用时可以在同页一键移除。", "Jev needs Full Access to call the model and read the clipboard:\n\n① Open Settings → General → Keyboard → Keyboards\n② Tap Add New Keyboard → Jev Keyboard\n③ Select Jev Keyboard → turn on Full Access\n\nFull Access lets the keyboard transmit keystrokes and clipboard content. The project is open source and uses only the API key you provide; you can remove it anytime."),
+            L("Jev 键盘要联网调用模型、读取剪贴板，这两项都要求完全访问：" + jevNL + jevNL + "① 打开系统「设置」→「通用」→「键盘」→「键盘」" + jevNL + "② 点「添加新键盘」→ 选「Jev 键盘」" + jevNL + "③ 点「Jev 键盘」→ 打开「允许完全访问」" + jevNL + jevNL + "完全访问意味着键盘能传输按键与剪贴板内容——本项目开源、只用你自己填的 API Key，不用时可以在同页一键移除。", "Jev needs Full Access to call the model and read the clipboard:" + jevNL + jevNL + "① Open Settings → General → Keyboard → Keyboards" + jevNL + "② Tap Add New Keyboard → Jev Keyboard" + jevNL + "③ Select Jev Keyboard → turn on Full Access" + jevNL + jevNL + "Full Access lets the keyboard transmit keystrokes and clipboard content. The project is open source and uses only the API key you provide; you can remove it anytime."),
             font: .systemFont(ofSize: 13), color: KB.primaryText, lines: 0)
         let vstack = UIStackView(arrangedSubviews: [title, steps])
         vstack.axis = .vertical
@@ -369,8 +355,8 @@ final class KeyboardViewController: UIInputViewController {
         let cfg = JevStore.loadConfig()
 
         let guide = KB.label(
-            L("输入框保持空白、不用粘贴：长按对方消息 → 复制 → 点「分析剪贴板」→ 点一条候选即可", "Keep the input box empty: long-press a message → Copy → Analyze Clipboard → tap a suggestion"),
-            font: .systemFont(ofSize: 12), color: KB.secondaryText, lines: 0)
+            L("长按对方消息 → 复制，点「分析剪贴板」；会自动带上之前的对话", "Long-press a message → Copy, then Analyze. Earlier turns are included automatically"),
+            font: .systemFont(ofSize: 12), color: KB.secondaryText)
 
         let clipBtn = KB.button(L("分析剪贴板", "Analyze Clipboard"), icon: "doc.on.clipboard", primary: true,
                                 font: .systemFont(ofSize: 14, weight: .semibold))
@@ -387,6 +373,19 @@ final class KeyboardViewController: UIInputViewController {
         btnRow.distribution = .fillEqually
         btnRow.heightAnchor.constraint(equalToConstant: 44).isActive = true
 
+        // 上下文行：左边点进去查看/管理，右边「＋」把刚复制的消息快速加入
+        let ctxBtn = KB.button(JevContextStore.shared.statusText(language: language),
+                               icon: "bubble.left.and.bubble.right",
+                               font: .systemFont(ofSize: 13, weight: .medium))
+        ctxBtn.addTarget(self, action: #selector(openContextManager), for: .touchUpInside)
+        let addCtxBtn = KB.button("", icon: "plus")
+        addCtxBtn.addTarget(self, action: #selector(quickAddContext), for: .touchUpInside)
+        addCtxBtn.widthAnchor.constraint(equalToConstant: 46).isActive = true
+        let ctxRow = UIStackView(arrangedSubviews: [ctxBtn, addCtxBtn])
+        ctxRow.axis = .horizontal
+        ctxRow.spacing = 8
+        ctxRow.heightAnchor.constraint(equalToConstant: 38).isActive = true
+
         // 话术：点进去直接在键盘上选（写回共享配置，App 的「话术」页看到的是同一份）
         let tonesBtn = KB.button(
             cfg.activeSlots.isEmpty
@@ -399,7 +398,7 @@ final class KeyboardViewController: UIInputViewController {
         // 待机页**不放**发送键：这一页还没有候选，没有可发的东西；而输入框一旦有字，
         // 宿主 App 自己的发送按钮就出来了，
         // 键盘下方再挂一个只是添乱。发送键只在结果页——点完候选、手还在面板上时用。
-        let vstack = UIStackView(arrangedSubviews: [guide, btnRow, tonesBtn])
+        let vstack = UIStackView(arrangedSubviews: [guide, btnRow, ctxRow, tonesBtn])
         vstack.axis = .vertical
         vstack.spacing = 8
         if JevDraft(cfg: cfg).isConfigured {
@@ -408,12 +407,6 @@ final class KeyboardViewController: UIInputViewController {
             let warn = KB.label(L("⚠️ 还没配置生成层：打开 Jev Jarvis App →「模型」页填 API Key", "⚠️ Generation is not configured: open Jev Jarvis → Models and add an API key"),
                                 font: .systemFont(ofSize: 12), color: .systemOrange, lines: 0)
             vstack.addArrangedSubview(warn)
-            // 全能签等第三方证书没有 App Group：从主 App「复制配置」后，点这里导入
-            let importBtn = KB.button(L("从剪贴板导入配置", "Import Config from Clipboard"), icon: "square.and.arrow.down",
-                                      font: .systemFont(ofSize: 13))
-            importBtn.heightAnchor.constraint(equalToConstant: 36).isActive = true
-            importBtn.addTarget(self, action: #selector(importConfig), for: .touchUpInside)
-            vstack.addArrangedSubview(importBtn)
         }
         fitBlocks = [vstack]
         return vstack
@@ -421,11 +414,7 @@ final class KeyboardViewController: UIInputViewController {
 
     // MARK: 话术选择视图（直接在键盘上配）
 
-    @objc private func openTonePicker() {
-        // 自动同步主 App「复制配置」的内容（自定义话术/槽位），读不到 App Group 时也能更新
-        if hasFullAccess { JevStore.autoImportConfigFromPasteboard() }
-        setMode(.tones)
-    }
+    @objc private func openTonePicker() { setMode(.tones) }
 
     /// 话术选择：内置 + 自定义全列出来，点一下选中/取消，最多 3 个槽。
     /// 每次从共享配置重新读（App 那边改过也能立刻看到），选中即落盘，下一次分析就生效。
@@ -434,7 +423,7 @@ final class KeyboardViewController: UIInputViewController {
         let names = orderedToneNames(custom: cfg.customTones)
         let active = cfg.activeSlots
 
-        let title = KB.label(L("选话术（最多 \(MAX_SLOTS) 个 · 每个每次出 2 条）", "Choose tones (up to \(MAX_SLOTS) · 2 suggestions each)"),
+        let title = KB.label(L("选话术（最多 " + String(MAX_SLOTS) + " 个 · 每个每次出 2 条）", "Choose tones (up to " + String(MAX_SLOTS) + " · 2 suggestions each)"),
                              font: .systemFont(ofSize: 12), color: KB.secondaryText, lines: 0)
         var blocks: [UIView] = [title]
 
@@ -459,11 +448,6 @@ final class KeyboardViewController: UIInputViewController {
             blocks.append(gridRow(cells))
         }
 
-        let update = KB.button(L("从剪贴板更新话术", "Update tones from clipboard"), icon: "square.and.arrow.down", primary: false)
-        update.heightAnchor.constraint(equalToConstant: 34).isActive = true
-        update.addTarget(self, action: #selector(updateTonesFromClipboard), for: .touchUpInside)
-        blocks.append(update)
-
         let done = KB.button(L("好了", "Done"), icon: "checkmark", primary: true)
         done.heightAnchor.constraint(equalToConstant: 36).isActive = true
         done.addTarget(self, action: #selector(backToIdle), for: .touchUpInside)
@@ -484,22 +468,6 @@ final class KeyboardViewController: UIInputViewController {
         return s
     }
 
-    /// 话术页手动更新：主 App「复制配置」后点这里，自定义话术立刻出现
-    @objc private func updateTonesFromClipboard() {
-        guard hasFullAccess else { setMode(.gate); return }
-        let imported = JevStore.autoImportConfigFromPasteboard()
-        render()
-        if !imported {
-            let alert = UIAlertController(
-                title: L("没有新配置", "No new config"),
-                message: L("剪贴板里没有更新的配置。请先打开 Jev Jarvis App →「开始」页点「复制配置到剪贴板」，再回来点这个按钮。",
-                           "The clipboard has no newer config. Open Jev Jarvis → Setup → Copy Config, then tap this button again."),
-                preferredStyle: .alert)
-            alert.addAction(UIAlertAction(title: L("好", "OK"), style: .default))
-            present(alert, animated: true)
-        }
-    }
-
     @objc private func toneChipTapped(_ sender: UIButton) {
         guard let name = sender.accessibilityIdentifier else { return }
         var cfg = JevStore.loadConfig()
@@ -515,6 +483,143 @@ final class KeyboardViewController: UIInputViewController {
         cfg.slots = Array(slots.prefix(MAX_SLOTS))
         JevStore.saveConfig(cfg)                       // 立刻落盘：下一次分析就用新槽位
         render()                                       // 重画刷新高亮
+    }
+
+    // MARK: 上下文（多轮记忆）
+
+    /// 读剪贴板文字（无则 nil）。
+    private func clipboardText() -> String? {
+        UIPasteboard.general.string?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    @objc private func openContextManager() { setMode(.context) }
+
+    /// 待机页快捷「＋」：把刚复制的消息记为「对方」。
+    @objc private func quickAddContext() {
+        guard let text = clipboardText(), !text.isEmpty else {
+            errorText = L("剪贴板是空的：先长按对方消息点「复制」。", "Clipboard is empty: long-press a message and Copy first.")
+            setMode(.error)
+            return
+        }
+        JevContextStore.shared.append(.them, text: text)
+        render()                                       // 刷新待机页状态
+    }
+
+    /// 上下文管理页。
+    private func contextView() -> UIView {
+        let store = JevContextStore.shared
+        let turns = store.turns()
+
+        let title = KB.label(
+            L("对话上下文 · 点 × 删单条", "Conversation context · tap × to remove a line"),
+            font: .systemFont(ofSize: 12, weight: .medium), color: KB.secondaryText, lines: 0)
+
+        // 历史列表（可滚动）
+        let list = UIStackView()
+        list.axis = .vertical
+        list.spacing = 5
+        if turns.isEmpty {
+            list.addArrangedSubview(KB.label(
+                L("还没有上下文。" + jevNL + "· 正常「分析 → 点候选」会自动记忆；" + jevNL + "· 或用下面按钮手动加入 / 一次粘贴多行。",
+                  "No context yet." + jevNL + "· Analyze and tap a suggestion to auto-save;" + jevNL + "· or add manually / paste multiple lines below."),
+                font: .systemFont(ofSize: 12), color: KB.secondaryText, lines: 0))
+        }
+        for turn in turns {
+            let row = ContextTurnRow(turn: turn, language: language)
+            row.onDelete = { id in
+                JevContextStore.shared.remove(id: id)
+                render()
+            }
+            list.addArrangedSubview(row)
+        }
+        let scroll = UIScrollView()
+        scroll.showsVerticalScrollIndicator = false
+        scroll.delaysContentTouches = false
+        scroll.addSubview(list)
+        list.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            list.topAnchor.constraint(equalTo: scroll.contentLayoutGuide.topAnchor),
+            list.bottomAnchor.constraint(equalTo: scroll.contentLayoutGuide.bottomAnchor),
+            list.leadingAnchor.constraint(equalTo: scroll.contentLayoutGuide.leadingAnchor),
+            list.trailingAnchor.constraint(equalTo: scroll.contentLayoutGuide.trailingAnchor),
+            list.widthAnchor.constraint(equalTo: scroll.widthAnchor),
+        ])
+
+        // 操作按钮
+        let addThem = KB.button(L("＋对方·剪贴板", "＋Them·clipboard"), icon: "person")
+        addThem.addTarget(self, action: #selector(addThemFromClipboard), for: .touchUpInside)
+        let addMe = KB.button(L("＋我·输入框", "＋Me·input"), icon: "keyboard")
+        addMe.addTarget(self, action: #selector( addMeFromInput), for: .touchUpInside)
+        let row1 = UIStackView(arrangedSubviews: [addThem, addMe])
+        row1.axis = .horizontal
+        row1.spacing = 6
+        row1.distribution = .fillEqually
+        row1.heightAnchor.constraint(equalToConstant: 38).isActive = true
+
+        let parse = KB.button(L("粘贴多行 · 自动拆分发言方", "Paste multiple lines · split speakers"), icon: "doc.text")
+        parse.addTarget(self, action: #selector(parseClipboardTranscript), for: .touchUpInside)
+        parse.heightAnchor.constraint(equalToConstant: 38).isActive = true
+
+        let clear = KB.button(L("新对话（清空）", "New chat (clear)"), icon: "trash")
+        clear.addTarget(self, action: #selector(clearContext), for: .touchUpInside)
+        let back = KB.button(L("返回", "Back"), icon: "chevron.left", primary: true)
+        back.addTarget(self, action: #selector(backToIdle), for: .touchUpInside)
+        let row3 = UIStackView(arrangedSubviews: [clear, back])
+        row3.axis = .horizontal
+        row3.spacing = 6
+        row3.distribution = .fillEqually
+        row3.heightAnchor.constraint(equalToConstant: 38).isActive = true
+
+        let outer = UIStackView(arrangedSubviews: [title, scroll, row1, parse, row3])
+        outer.axis = .vertical
+        outer.spacing = 6
+        fitBlocks = [title, list, row1, parse, row3]
+        return outer
+    }
+
+    @objc private func addThemFromClipboard() {
+        guard let text = clipboardText(), !text.isEmpty else {
+            errorText = L("剪贴板是空的：先长按对方消息点「复制」。", "Clipboard is empty: long-press a message and Copy first.")
+            setMode(.error)
+            return
+        }
+        JevContextStore.shared.append(.them, text: text)
+        render()
+    }
+
+    @objc private func addMeFromInput() {
+        let text = ((textDocumentProxy.documentContextBeforeInput ?? "")
+                  + (textDocumentProxy.documentContextAfterInput ?? ""))
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else {
+            errorText = L("输入框里没有文字：先把要记为「我」的话打进输入框。", "The input is empty: type what should be saved as Me first.")
+            setMode(.error)
+            return
+        }
+        JevContextStore.shared.append(.me, text: text)
+        render()
+    }
+
+    @objc private func parseClipboardTranscript() {
+        guard let raw = UIPasteboard.general.string,
+              !raw.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            errorText = L("剪贴板是空的：先把聊天记录复制下来（微信里可「多选 → 复制」）。", "Clipboard is empty: copy the chat first (in WeChat use Select → Copy).")
+            setMode(.error)
+            return
+        }
+        let n = JevContextStore.shared.addParsedTranscript(raw)
+        guard n > 0 else {
+            errorText = L("没解析出有效内容：换「多选 → 复制」或手动逐条加入。", "Nothing parsed: use Select → Copy or add lines manually.")
+            setMode(.error)
+            return
+        }
+        render()
+    }
+
+    @objc private func clearContext() {
+        JevContextStore.shared.clear()
+        render()
     }
 
     // MARK: 加载视图
@@ -611,15 +716,24 @@ final class KeyboardViewController: UIInputViewController {
             row.onInsert = { [weak self] candidate in
                 guard let self else { return }
 #if DEBUG
-                JevStore.diag("准备插入：话术=\(candidate.tone) 字数=\(candidate.text.count)")
+                JevStore.diag("准备插入：话术=" + candidate.tone + " 字数=" + String(candidate.text.count))
 #endif
-                self.clearInputField()
                 self.textDocumentProxy.insertText(candidate.text)
 #if DEBUG
                 let ctx = self.textDocumentProxy.documentContextBeforeInput ?? "<拿不到>"
-                JevStore.diag("插入后输入框尾部=「\(ctx.suffix(24))」")
+                JevStore.diag("插入后输入框尾部=「" + ctx.suffix(24) + "」")
 #endif
-                self.flashFooter(self.L("已插入 · 点「发送」发出", "Inserted · tap Send to submit"), color: KB.riskColor(0))
+                // 自动记忆这一轮（仅「剪贴板」路径才是对方发来的消息；输入框路径不记）
+                var saved = false
+                if JevContextStore.shared.loadSettings().autoRecord, self.lastSource == .clipboard {
+                    JevContextStore.shared.recordExchange(incoming: self.lastMessage, reply: candidate.text)
+                    saved = true
+                }
+                self.flashFooter(
+                    saved
+                        ? self.L("已插入并记入上下文 · 点「发送」发出", "Inserted & saved to context · tap Send")
+                        : self.L("已插入 · 点「发送」发出", "Inserted · tap Send to submit"),
+                    color: KB.riskColor(0))
             }
             list.addArrangedSubview(row)
         }
@@ -684,7 +798,7 @@ final class KeyboardViewController: UIInputViewController {
     @objc private func sendMessage() {
         guard hasFullAccess else { setMode(.gate); return }
         let before = textDocumentProxy.documentContextBeforeInput ?? ""
-        textDocumentProxy.insertText("\n")
+        textDocumentProxy.insertText(jevNL)
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
             guard let self else { return }
             let after = self.textDocumentProxy.documentContextBeforeInput ?? ""
@@ -711,14 +825,7 @@ final class KeyboardViewController: UIInputViewController {
         let btns = UIStackView(arrangedSubviews: [retry, close])
         btns.axis = .horizontal
         btns.spacing = 8
-        var items: [UIView] = [title, body]
-        if errorText.contains("还没配置生成层") || errorText.contains("Generation is not configured") {
-            let importBtn = KB.button(L("从剪贴板导入配置", "Import Config"), icon: "square.and.arrow.down", primary: true)
-            importBtn.addTarget(self, action: #selector(importConfig), for: .touchUpInside)
-            items.append(importBtn)
-        }
-        items.append(btns)
-        let vstack = UIStackView(arrangedSubviews: items)
+        let vstack = UIStackView(arrangedSubviews: [title, body, btns])
         vstack.axis = .vertical
         vstack.spacing = 8
         vstack.isLayoutMarginsRelativeArrangement = true
@@ -765,39 +872,24 @@ final class KeyboardViewController: UIInputViewController {
     @objc private func regenerate() { run(message: lastMessage) }
     @objc private func backToIdle() { setMode(.idle) }
 
-    /// 无 App Group 时（全能签等第三方证书）：从系统剪贴板导入主 App 复制的配置。
-    @objc private func importConfig() {
-        guard hasFullAccess else { setMode(.gate); return }
-        if JevStore.importConfigFromPasteboard() {
-            let alert = UIAlertController(
-                title: L("导入成功 ✅", "Imported ✅"),
-                message: L("键盘已保存配置。接下来：长按对方消息 → 复制 → 点「分析剪贴板」",
-                           "Config saved. Next: long-press a message → Copy → Analyze Clipboard."),
-                preferredStyle: .alert)
-            alert.addAction(UIAlertAction(title: L("好", "OK"), style: .default) { _ in self.setMode(.idle) })
-            present(alert, animated: true)
-        } else {
-            errorText = L("剪贴板里没有配置。请先打开 Jev Jarvis App →「开始」页点「复制配置到剪贴板」（注意顺序：先导入配置，再复制聊天消息），iOS 若弹粘贴授权请点允许。",
-                          "No config on the clipboard. Open Jev Jarvis → Setup → Copy Config first (import config before copying any chat message), and allow the paste prompt.")
-            setMode(.error)
-        }
-    }
-
     private func run(message: String) {
         lastMessage = message
         setMode(.loading)
         stageLabel.text = L("判断中…", "Judging…")
+        // 带上之前的对话（自动记忆 + 手动补充 + 常驻笔记）
+        let contextRaw = JevContextStore.shared.contextString(forAnswering: message, language: language)
+        let context = contextRaw.isEmpty ? nil : contextRaw
         let pipeline = JevPipeline(cfg: JevStore.loadConfig())
 
         Task { @MainActor [weak self] in
             let analysis = await pipeline.analyze(
-                message: message, context: nil,
+                message: message, context: context,
                 onStage: { [weak self] stage in
                     Task { @MainActor in
                         switch stage {
                         case .judging: self?.stageLabel.text = self?.L("判断中…", "Judging…")
                         case .drafting(let done, let total):
-                            self?.stageLabel.text = self?.L("生成中 \(done)/\(total)…", "Drafting \(done)/\(total)…")
+                            self?.stageLabel.text = self?.L("生成中 " + String(done) + "/" + String(total) + "…", "Drafting " + String(done) + "/" + String(total) + "…")
                         case .ranking: self?.stageLabel.text = self?.L("排序中…", "Ranking…")
                         case .done: self?.stageLabel.text = self?.L("完成", "Done")
                         }
@@ -822,4 +914,55 @@ final class KeyboardViewController: UIInputViewController {
             }
         }
     }
+}
+
+// MARK: - 上下文管理页里的单条记录行
+
+/// 一行历史：发言方徽章 + 正文 + 删除按钮。
+private final class ContextTurnRow: UIView {
+    let turn: ChatTurn
+    var onDelete: ((UUID) -> Void)?
+
+    init(turn: ChatTurn, language: JevLanguage) {
+        self.turn = turn
+        super.init(frame: .zero)
+
+        let isThem = turn.speaker == .them
+        let color = isThem ? KB.brand : KB.riskColor(0)
+        let name = turn.speaker.label(
+            language: language,
+            contactName: JevContextStore.shared.loadSettings().contactName)
+        let badge = KB.badge(name, color: color)
+        badge.font = .systemFont(ofSize: 11, weight: .medium)
+
+        let text = KB.label(turn.text, font: .systemFont(ofSize: 13), lines: 2)
+
+        let del = KB.button("", icon: "xmark")
+        del.addTarget(self, action: #selector(deleteTapped), for: .touchUpInside)
+        del.widthAnchor.constraint(equalToConstant: 34).isActive = true
+
+        let hstack = UIStackView(arrangedSubviews: [badge, text, del])
+        hstack.axis = .horizontal
+        hstack.spacing = 6
+        hstack.alignment = .center
+        hstack.isLayoutMarginsRelativeArrangement = true
+        hstack.directionalLayoutMargins = NSDirectionalEdgeInsets(top: 4, leading: 6, bottom: 4, trailing: 6)
+
+        addSubview(hstack)
+        hstack.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            hstack.topAnchor.constraint(equalTo: topAnchor),
+            hstack.bottomAnchor.constraint(equalTo: bottomAnchor),
+            hstack.leadingAnchor.constraint(equalTo: leadingAnchor),
+            hstack.trailingAnchor.constraint(equalTo: trailingAnchor),
+        ])
+        backgroundColor = KB.card
+        layer.cornerRadius = 9
+        layer.borderWidth = 1
+        layer.borderColor = KB.cardBorder.cgColor
+    }
+
+    @objc private func deleteTapped() { onDelete?(turn.id) }
+
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 }
