@@ -1,5 +1,12 @@
 import SwiftUI
 
+/// 品牌色（App target 看不到键盘模块里的 KB，这里按同一组色值自带一份，跟随深色模式）。
+private let jevBrandColor = Color(UIColor { traits in
+    traits.userInterfaceStyle == .dark
+        ? UIColor(red: 0.62, green: 0.62, blue: 0.95, alpha: 1)
+        : UIColor(red: 0.36, green: 0.36, blue: 0.84, alpha: 1)
+})
+
 /// 上下文页的本地状态（与 ConfigStore 分开：只管对话记录与上下文设置）。
 @MainActor
 final class ContextStoreUI: ObservableObject {
@@ -102,7 +109,7 @@ struct ContextView: View {
             Text(jevLocalized(lang, zh: "一次补多句", en: "Add many at once"))
         } footer: {
             Text(jevLocalized(lang,
-                              zh: "微信 / QQ 里「多选 → 复制」，形如「名字: 内容」会自动区分「对方 / 我」；日期等杂行会忽略。",
+                              zh: "微信 / QQ 里「多选 → 复制」，形如「名字: 内容」会自动区分「对方 / 我」；日期等杂行忽略。",
                               en: "Use Select → Copy in WeChat/QQ. Lines like “Name: text” are split by speaker; date lines are ignored."))
         }
     }
@@ -119,7 +126,7 @@ struct ContextView: View {
                 HStack(alignment: .top, spacing: 8) {
                     Text(turn.speaker.label(language: lang, contactName: ctx.settings.contactName))
                         .font(.caption.weight(.semibold))
-                        .foregroundStyle(turn.speaker == .them ? Color(KB.brand) : .green)
+                        .foregroundStyle(turn.speaker == .them ? jevBrandColor : .green)
                         .frame(width: 46, alignment: .leading)
                     Text(turn.text).font(.subheadline)
                 }
