@@ -1,6 +1,6 @@
 name: Build iOS IPA
 
-# 在云端 Mac 上编译「未签名 IPA」并发到 Release，方便用全能签等工具签名安装。
+# 在云端 Mac 上编译「未签名 IPA」并发到 Release；失败也把编译日志公开，便于定位。
 on:
   push:
     branches: [main, master]
@@ -26,8 +26,34 @@ jobs:
       - name: Show build environment
         run: xcodebuild -version && swift --version
 
-      - name: Build (no signing)
-        run: xcodebuild -project JevJarvis.xcodeproj -scheme JevJarvis -sdk iphoneos -configuration Release -destination 'generic/platform=iOS' CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" ONLY_ACTIVE_ARCH=NO build
+      # 关键：无论成败都把完整日志落盘，并抽出 error 行；本步骤不直接让任务失败。
+      - name: Build (no signing, capture log)
+        id: build
+        run: |
+          set +e
+          xcodebuild -project JevJarvis.xcodeproj -scheme JevJarvis -sdk iphoneos -configuration Release -destination 'generic/platform=iOS' CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" ONLY_ACTIVE_ARCH=NO build > buildlog.txt 2>&1
+          echo "code=$?" >> "$GITHUB_OUTPUT"
+          grep -nE "error:|fatal error:|cannot find|has no member|is ambiguous|missing argument|extra argument" buildlog.txt > builderrors.txt || true
+          echo "----- extracted errors -----"
+          cat builderrors.txt || true
+          echo "----------------------------"
+
+      # 无论编译成功还是失败，都确保有 Release 并上传日志（公开可下载）。
+      - name: Publish diagnostics to Release
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="v1.4-context"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" buildlog.txt builderrors.txt --clobber
+          else
+            gh release create "$TAG" buildlog.txt builderrors.txt --title "iPhone 聊天助手（含多轮上下文）" --notes "构建日志见附件。"
+          fi
+
+      # 编译失败则在此明确失败、终止后续打包。
+      - name: Assert build succeeded
+        run: test "${{ steps.build.outputs.code }}" = "0"
 
       - name: Locate app & verify keyboard extension
         id: locate
@@ -47,16 +73,12 @@ jobs:
           (cd staging && zip -qr ../JevJarvis-unsigned.ipa Payload)
           unzip -l JevJarvis-unsigned.ipa | head -20
 
-      - name: Publish to GitHub Release
+      - name: Publish IPA to GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           TAG="v1.4-context"
-          if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release upload "$TAG" JevJarvis-unsigned.ipa --clobber
-          else
-            gh release create "$TAG" JevJarvis-unsigned.ipa --title "iPhone 聊天助手（含多轮上下文）" --notes "未签名 IPA：用全能签等工具签名后安装。本版修复了 iPhone 上只能回最后一句的问题，支持多轮上下文。"
-          fi
+          gh release upload "$TAG" JevJarvis-unsigned.ipa --clobber
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
