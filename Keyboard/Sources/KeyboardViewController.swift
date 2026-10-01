@@ -26,6 +26,7 @@ final class KeyboardViewController: UIInputViewController {
     private var errorText: String = ""
     private var importStatus: String = ""
     private var stageLabel = UILabel()
+    private var flashTarget: UILabel?
 
     private enum Source { case clipboard, inputField }
 
@@ -100,7 +101,7 @@ final class KeyboardViewController: UIInputViewController {
         guard let url = URL(string: base + "/models") else { return }
         var req = URLRequest(url: url)
         req.httpMethod = "GET"
-        req.setValue("Bearer " + g.key, forKeyHeader: "Authorization")
+        req.setValue("Bearer " + g.key, forHTTPHeaderField: "Authorization")
         req.timeoutInterval = 8
         URLSession.shared.dataTask(with: req) { _, _, _ in }.resume()
     }
@@ -133,14 +134,14 @@ final class KeyboardViewController: UIInputViewController {
         title.alignment = .center
 
         let globe = KB.button("", icon: "globe")
-        globe.addTarget(self, action: #selector(switchKeyboard), forKey: .touchUpInside)
+        globe.addTarget(self, action: #selector(switchKeyboard), for: .touchUpInside)
         NSLayoutConstraint.activate([
             globe.widthAnchor.constraint(equalToConstant: 44),
             globe.heightAnchor.constraint(equalToConstant: 36),
         ])
 
         let backspace = KB.button("", icon: "delete.left")
-        backspace.addTarget(self, action: #selector(deleteBackwardTapped), forKey: .touchUpInside)
+        backspace.addTarget(self, action: #selector(deleteBackwardTapped), for: .touchUpInside)
         NSLayoutConstraint.activate([
             backspace.widthAnchor.constraint(equalToConstant: 44),
             backspace.heightAnchor.constraint(equalToConstant: 36),
@@ -277,9 +278,7 @@ final class KeyboardViewController: UIInputViewController {
 
     @objc private func switchKeyboard() { advanceToNextInputMode() }
 
-    @objc private func deleteBackwardTapped() {
-        textDocumentProxy.deleteBackward()
-    }
+    @objc private func deleteBackwardTapped() { textDocumentProxy.deleteBackward() }
 
 #if DEBUG
     /// 自检入口：把面板直接切到某个状态渲染出来。
@@ -359,11 +358,11 @@ final class KeyboardViewController: UIInputViewController {
 
         let clipBtn = KB.button(L("分析剪贴板", "Analyze Clipboard"), icon: "doc.on.clipboard", primary: true,
                                 font: .systemFont(ofSize: 14, weight: .semibold))
-        clipBtn.addTarget(self, action: #selector(analyzeClipboard), forKey: .touchUpInside)
+        clipBtn.addTarget(self, action: #selector(analyzeClipboard), for: .touchUpInside)
 
         let inputBtn = KB.button(L("AI 分析输入框文字", "Analyze Input"), icon: "text.cursor",
                                  font: .systemFont(ofSize: 14, weight: .semibold))
-        inputBtn.addTarget(self, action: #selector(analyzeInputField), forKey: .touchUpInside)
+        inputBtn.addTarget(self, action: #selector(analyzeInputField), for: .touchUpInside)
 
         // 两个分析入口并排：左边读剪贴板（主路径，主色），右边读当前输入框
         let btnRow = UIStackView(arrangedSubviews: [clipBtn, inputBtn])
@@ -376,9 +375,9 @@ final class KeyboardViewController: UIInputViewController {
         let ctxBtn = KB.button(JevContextStore.shared.statusText(language: language),
                                icon: "bubble.left.and.bubble.right",
                                font: .systemFont(ofSize: 13, weight: .medium))
-        ctxBtn.addTarget(self, action: #selector(openContextManager), forKey: .touchUpInside)
+        ctxBtn.addTarget(self, action: #selector(openContextManager), for: .touchUpInside)
         let addCtxBtn = KB.button("", icon: "plus")
-        addCtxBtn.addTarget(self, action: #selector(quickAddContext), forKey: .touchUpInside)
+        addCtxBtn.addTarget(self, action: #selector(quickAddContext), for: .touchUpInside)
         addCtxBtn.widthAnchor.constraint(equalToConstant: 46).isActive = true
         let ctxRow = UIStackView(arrangedSubviews: [ctxBtn, addCtxBtn])
         ctxRow.axis = .horizontal
@@ -392,7 +391,7 @@ final class KeyboardViewController: UIInputViewController {
                 : L("话术：", "Tones: ") + cfg.activeSlots.map { localizedToneName($0, language: language) }.joined(separator: " · "),
             icon: "theatermasks")
         tonesBtn.heightAnchor.constraint(equalToConstant: 34).isActive = true
-        tonesBtn.addTarget(self, action: #selector(openTonePicker), forKey: .touchUpInside)
+        tonesBtn.addTarget(self, action: #selector(openTonePicker), for: .touchUpInside)
 
         // 待机页**不放**发送键：这一页还没有候选，没有可发的东西；而输入框一旦有字，
         // 宿主 App 自己的发送按钮就出来了，
@@ -409,7 +408,7 @@ final class KeyboardViewController: UIInputViewController {
                                       icon: "square.and.arrow.down.on.doc",
                                       font: .systemFont(ofSize: 13, weight: .medium))
             importBtn.heightAnchor.constraint(equalToConstant: 38).isActive = true
-            importBtn.addTarget(self, action: #selector(importConfig), forKey: .touchUpInside)
+            importBtn.addTarget(self, action: #selector(importConfig), for: .touchUpInside)
             vstack.addArrangedSubview(importBtn)
             if !importStatus.isEmpty {
                 vstack.addArrangedSubview(KB.label(importStatus, font: .systemFont(ofSize: 11),
@@ -458,7 +457,7 @@ final class KeyboardViewController: UIInputViewController {
                                 font: .systemFont(ofSize: 13, weight: .medium))
             btn.heightAnchor.constraint(equalToConstant: 34).isActive = true
             btn.accessibilityIdentifier = name
-            btn.addTarget(self, action: #selector(toneChipTapped(_:)), forKey: .touchUpInside)
+            btn.addTarget(self, action: #selector(toneChipTapped(_:)), for: .touchUpInside)
             row.append(btn)
             if row.count == 3 {
                 blocks.append(gridRow(row))
@@ -474,7 +473,7 @@ final class KeyboardViewController: UIInputViewController {
 
         let done = KB.button(L("好了", "Done"), icon: "checkmark", primary: true)
         done.heightAnchor.constraint(equalToConstant: 36).isActive = true
-        done.addTarget(self, action: #selector(backToIdle), forKey: .touchUpInside)
+        done.addTarget(self, action: #selector(backToIdle), for: .touchUpInside)
         blocks.append(done)
 
         let outer = UIStackView(arrangedSubviews: blocks)
@@ -527,7 +526,7 @@ final class KeyboardViewController: UIInputViewController {
             return
         }
         JevContextStore.shared.append(.them, text: text)
-        render()                                       // 刷新待机页状态
+        render()
     }
 
     /// 上下文管理页。
@@ -572,9 +571,9 @@ final class KeyboardViewController: UIInputViewController {
 
         // 操作按钮
         let addThem = KB.button(L("＋对方·剪贴板", "＋Them·clipboard"), icon: "person")
-        addThem.addTarget(self, action: #selector(addThemFromClipboard), forKey: .touchUpInside)
+        addThem.addTarget(self, action: #selector(addThemFromClipboard), for: .touchUpInside)
         let addMe = KB.button(L("＋我·输入框", "＋Me·input"), icon: "keyboard")
-        addMe.addTarget(self, action: #selector(addMeFromInput), forKey: .touchUpInside)
+        addMe.addTarget(self, action: #selector(addMeFromInput), for: .touchUpInside)
         let row1 = UIStackView(arrangedSubviews: [addThem, addMe])
         row1.axis = .horizontal
         row1.spacing = 6
@@ -582,13 +581,13 @@ final class KeyboardViewController: UIInputViewController {
         row1.heightAnchor.constraint(equalToConstant: 38).isActive = true
 
         let parse = KB.button(L("粘贴多行 · 自动拆分发言方", "Paste multiple lines · split speakers"), icon: "doc.text")
-        parse.addTarget(self, action: #selector(parseClipboardTranscript), forKey: .touchUpInside)
+        parse.addTarget(self, action: #selector(parseClipboardTranscript), for: .touchUpInside)
         parse.heightAnchor.constraint(equalToConstant: 38).isActive = true
 
         let clear = KB.button(L("新对话（清空）", "New chat (clear)"), icon: "trash")
-        clear.addTarget(self, action: #selector(clearContext), forKey: .touchUpInside)
+        clear.addTarget(self, action: #selector(clearContext), for: .touchUpInside)
         let back = KB.button(L("返回", "Back"), icon: "chevron.left", primary: true)
-        back.addTarget(self, action: #selector(backToIdle), forKey: .touchUpInside)
+        back.addTarget(self, action: #selector(backToIdle), for: .touchUpInside)
         let row3 = UIStackView(arrangedSubviews: [clear, back])
         row3.axis = .horizontal
         row3.spacing = 6
@@ -683,7 +682,7 @@ final class KeyboardViewController: UIInputViewController {
             // 风险等级文案跟徽章同一行——它单独占一行太浪费高度（键盘面板寸土寸金）
             let riskText = KB.label(localizedRiskLabel(jr.risk, language: language), font: .systemFont(ofSize: 12),
                                     color: KB.riskColor(jr.risk), lines: 1)
-            riskText.setContentHuggingPriority(.required, forKey: .horizontal)
+            riskText.setContentHuggingPriority(.required, for: .horizontal)
             let chipRow = UIStackView(arrangedSubviews: [
                 KB.badge(localizedIntent(jr.intent, language: language), color: KB.brand),
                 KB.badge(L(String(format: "风险 %.0f/9", jr.risk), String(format: "Risk %.0f/9", jr.risk)), color: KB.riskColor(jr.risk)),
@@ -782,12 +781,12 @@ final class KeyboardViewController: UIInputViewController {
 
         // 底部操作：发送挪到右下角，左边留给换一批/返回
         let send = KB.button(L("发送", "Send"), icon: "paperplane.fill", primary: true)
-        send.addTarget(self, action: #selector(sendMessage), forKey: .touchUpInside)
+        send.addTarget(self, action: #selector(sendMessage), for: .touchUpInside)
         send.widthAnchor.constraint(equalToConstant: 96).isActive = true
         let regen = KB.button(L("换一批", "Regenerate"), icon: "arrow.clockwise")
-        regen.addTarget(self, action: #selector(regenerate), forKey: .touchUpInside)
+        regen.addTarget(self, action: #selector(regenerate), for: .touchUpInside)
         let close = KB.button(L("返回", "Back"), icon: "chevron.left")
-        close.addTarget(self, action: #selector(backToIdle), forKey: .touchUpInside)
+        close.addTarget(self, action: #selector(backToIdle), for: .touchUpInside)
         let actions = UIStackView(arrangedSubviews: [regen, close, UIView(), send])
         actions.axis = .horizontal
         actions.spacing = 8
@@ -795,11 +794,11 @@ final class KeyboardViewController: UIInputViewController {
         outer.addArrangedSubview(footer)
 
         // 只让候选区伸缩：卡片/按钮都按内容 hug，否则会被多余的垂直空间拉出空白。
-        header.setContentHuggingPriority(.required, forKey: .vertical)
-        actions.setContentHuggingPriority(.required, forKey: .vertical)
-        footer.setContentHuggingPriority(.required, forKey: .vertical)
-        scroll.setContentHuggingPriority(.defaultLow, forKey: .vertical)
-        scroll.setContentCompressionResistancePriority(.defaultLow, forKey: .vertical)
+        header.setContentHuggingPriority(.required, for: .vertical)
+        actions.setContentHuggingPriority(.required, for: .vertical)
+        footer.setContentHuggingPriority(.required, for: .vertical)
+        scroll.setContentHuggingPriority(.defaultLow, for: .vertical)
+        scroll.setContentCompressionResistancePriority(.defaultLow, for: .vertical)
         fitBlocks = [header, list, actions, footer]
         return outer
     }
@@ -843,9 +842,9 @@ final class KeyboardViewController: UIInputViewController {
         let title = KB.label(L("出错了", "Something went wrong"), font: .systemFont(ofSize: 15, weight: .bold), color: .systemRed)
         let body = KB.label(errorText, font: .systemFont(ofSize: 13), color: KB.primaryText, lines: 0)
         let retry = KB.button(L("重试", "Retry"), icon: "arrow.clockwise")
-        retry.addTarget(self, action: #selector(regenerate), forKey: .touchUpInside)
+        retry.addTarget(self, action: #selector(regenerate), for: .touchUpInside)
         let close = KB.button(L("返回", "Back"), icon: "chevron.left")
-        close.addTarget(self, action: #selector(backToIdle), forKey: .touchUpInside)
+        close.addTarget(self, action: #selector(backToIdle), for: .touchUpInside)
         let btns = UIStackView(arrangedSubviews: [retry, close])
         btns.axis = .horizontal
         btns.spacing = 8
@@ -886,7 +885,7 @@ final class KeyboardViewController: UIInputViewController {
         let after = textDocumentProxy.documentContextAfterInput ?? ""
         let text = (before + after).trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else {
-            errorText = L("输入框里没有文字。这个按钮分析的是当前输入框里已输入的内容（比如你打了一半拿不准的话）。", "The input is empty. This button analyzes text already typed in the field.")
+            errorText = L("输入框里没有文字。这个按钮分析的是当前输入框里已输入的内容（比如你打了一半拿不准的话）。", "The input is empty: this button analyzes text already typed in the field.")
             setMode(.error)
             return
         }
@@ -962,7 +961,7 @@ private final class ContextTurnRow: UIView {
         let text = KB.label(turn.text, font: .systemFont(ofSize: 13), lines: 2)
 
         let del = KB.button("", icon: "xmark")
-        del.addTarget(self, action: #selector(deleteTapped), forKey: .touchUpInside)
+        del.addTarget(self, action: #selector(deleteTapped), for: .touchUpInside)
         del.widthAnchor.constraint(equalToConstant: 34).isActive = true
 
         let hstack = UIStackView(arrangedSubviews: [badge, text, del])
