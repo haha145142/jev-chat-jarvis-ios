@@ -227,7 +227,7 @@ enum JevStore {
         return true
     }
 
-    /// 键盘端：从系统剪贴板读取配置 JSON，存入本进程私有库。
+    /// 键盘端：从剪贴板读取配置 JSON，存入本进程私有库。
     @discardableResult
     static func importConfigFromPasteboard() -> Bool {
         guard let s = UIPasteboard.general.string?
@@ -264,12 +264,12 @@ enum JevStore {
     /// 与默认行为一致，不影响使用。
     static var knowledgeEnabled: Bool {
         get {
-            if let v = groupDefaults?.object(forKey: knowledgeEnabledKey) as? Bool { return v }
+            if let v = groupDefaults.object(forKey: knowledgeEnabledKey) as? Bool { return v }
             if let v = privateDefaults.object(forKey: knowledgeEnabledKey) as? Bool { return v }
             return true
         }
         set {
-            groupDefaults?.set(newValue, forKey: knowledgeEnabledKey)
+            groupDefaults.set(newValue, forKey: knowledgeEnabledKey)
             privateDefaults.set(newValue, forKey: knowledgeEnabledKey)
         }
     }
