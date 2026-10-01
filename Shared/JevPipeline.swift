@@ -65,16 +65,21 @@ final class JevPipeline {
             return out
         }
         guard draft.isConfigured else {
-            out.fatalError = "还没配置生成层：打开 Jev Jarvis App →「模型」页填 API Key"
+            out.fatalError = “还没配置生成层：打开 Jev Jarvis App →「模型」页填 API Key”
             return out
         }
 
-        // 知识融合（整条分析只算一次）：内置笔记命中=关系原则纲领，军师文献=具体方法参考。
+        // 知识融合（整条分析只算一次）：内置笔记命中=关系原则纲领（常驻，含安全底线）；
+        // 狗头军师文献 + 恋爱大师方法由「自动携带恋爱知识库」开关控制（默认开）。
         let noteBg = JevNoteStore.background(for: msg)
-        let methods = GoutouKnowledge.snippet(for: msg, context: context)
         var knowledgeParts: [String] = []
         if !noteBg.isEmpty { knowledgeParts.append("【关系原则·本地笔记命中】\n" + noteBg) }
-        if !methods.isEmpty { knowledgeParts.append("【方法参考·军师文献】\n" + methods) }
+        if JevStore.knowledgeEnabled {
+            let methods = GoutouKnowledge.snippet(for: msg, context: context)
+            if !methods.isEmpty { knowledgeParts.append("【方法参考·狗头军师文献】\n" + methods) }
+            let love = LoveCoach.snippet(for: msg, context: context)
+            if !love.isEmpty { knowledgeParts.append("【恋爱大师·阶段判断与打法】\n" + love) }
+        }
         let knowledge = knowledgeParts.joined(separator: "\n\n")
 
         // 1) 判断层：起跑，但**不阻塞起草**。
@@ -121,7 +126,7 @@ final class JevPipeline {
         func partial(with round: DraftRound, judge: JudgeResult?, extraNotices: [String] = []) -> Analysis {
             var p = out
             p.judge = judge
-            p.candidates = Self.ordered(active.map(\.0), round.candidates)
+            p.candidates = Self.deduped(Self.ordered(active.map(\.0), round.candidates))
             p.notices = out.notices + round.notices + extraNotices
             p.rankingPending = true
             p.elapsed = Date().timeIntervalSince(start)
@@ -198,6 +203,8 @@ final class JevPipeline {
             out.candidates = ordered
         }
 
+        // 出结果前统一按文本去重，杜绝 ForEach 重复 id 闪退（覆盖上面所有分支）。
+        out.candidates = Self.deduped(out.candidates)
         out.elapsed = Date().timeIntervalSince(start)
         onStage?(.done)
         return out
@@ -206,6 +213,13 @@ final class JevPipeline {
     /// 按话术槽的顺序整理候选（每个槽内部保持模型给出的顺序：前稳后放）
     private static func ordered(_ tones: [String], _ drafted: [Candidate]) -> [Candidate] {
         tones.flatMap { name in drafted.filter { $0.tone == name } }
+    }
+
+    /// 按文本去重，保留第一次出现。两个话术可能给出一模一样的句子，
+    /// 而界面 ForEach 用 text 当 id——重复 id 在 SwiftUI 里可能直接 trap 闪退。
+    static func deduped(_ candidates: [Candidate]) -> [Candidate] {
+        var seen = Set<String>()
+        return candidates.filter { seen.insert($0.text).inserted }
     }
 
     /// 风险达到这个分数才值得用意图重写候选（0-9 分制，6 起是"需要谨慎"那一档）。
