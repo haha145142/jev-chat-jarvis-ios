@@ -10,8 +10,8 @@ import Foundation
 //   · 常驻笔记：写一段背景（两人关系、前情提要），每次分析都带上。
 // 生成出的文本通过 JevPipeline 的 context 参数注入（见 JevPrompts / JevJudge）。
 
-/// 换行符（用码位构造，避免在源码里写反斜杠转义）。
-private let jevNL = String(Character(UnicodeScalar(10)!))
+/// 换行符（用码位构造，避免在源码里写反斜杠转义）。共享给 App 与键盘两个 target。
+let jevNL = String(Character(UnicodeScalar(10)!))
 
 /// 一条对话。
 struct ChatTurn: Codable, Equatable, Identifiable {
