@@ -209,7 +209,7 @@ enum JevStore {
         var out: [String: String] = [:]
         for store in [groupDefaults, privateDefaults] {
             if let data = store.data(forKey: customTonesKey),
-               let t = try? JSONDecoder().decode([String: String].self, from: data) {
+              let t = try? JSONDecoder().decode([String: String].self, from: data) {
                 for (k, v) in t where out[k] == nil { out[k] = v }
             }
         }
@@ -253,6 +253,25 @@ enum JevStore {
         saveConfig(cfg)
         saveCustomTonesStandalone(cfg.customTones)
         return true
+    }
+
+    // MARK: 内置知识库开关
+
+    private static let knowledgeEnabledKey = "jev.knowledgeEnabled.v1"
+
+    /// 「自动携带恋爱知识库（狗头军师·恋爱大师）」开关，默认开。
+    /// 双写 group/private：第三方签名 group 不通时，键盘读不到 App 的设置，会落到默认值 true，
+    /// 与默认行为一致，不影响使用。
+    static var knowledgeEnabled: Bool {
+        get {
+            if let v = groupDefaults?.object(forKey: knowledgeEnabledKey) as? Bool { return v }
+            if let v = privateDefaults.object(forKey: knowledgeEnabledKey) as? Bool { return v }
+            return true
+        }
+        set {
+            groupDefaults?.set(newValue, forKey: knowledgeEnabledKey)
+            privateDefaults.set(newValue, forKey: knowledgeEnabledKey)
+        }
     }
 
     static func loadKeyboardStatus() -> KeyboardStatus? {
